@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """
 Comprehensive Test Suite for Stock Analysis Features
 Tests all functionality including news integration, config management, and recommendations

@@ -1,10 +1,13 @@
 # Stock Analysis System
 
-Advanced stock analysis system with news sentiment integration, smart recommendations, and automated reporting.
+Advanced stock analysis system with **multi-source data validation**, news sentiment integration, smart recommendations, and automated reporting.
 
 ## Features
 
 ✅ **Real-time Stock Analysis** - Buy/sell recommendations with entry/exit points  
+✅ **Multi-Source Data Validation** - Cross-verify data from Yahoo Finance + Alpha Vantage  
+✅ **RSI Technical Indicator** - Identify overbought/oversold conditions  
+✅ **Consensus Recommendations** - Combined signals from multiple data sources  
 ✅ **News Sentiment Integration** - Analyzes news to predict price trajectory  
 ✅ **Top N Recommendations** - Multi-factor scoring system (50 points)  
 ✅ **Historical Analysis** - 3-month performance tracking with trends  
@@ -19,9 +22,19 @@ Advanced stock analysis system with news sentiment integration, smart recommenda
 ```bash
 cd server
 source .venv/bin/activate
+pip install requests  # For Alpha Vantage API
 ```
 
-### 2. Configure Settings
+### 2. Get Alpha Vantage API Key (Optional but Recommended)
+For multi-source data validation and RSI indicators:
+1. Visit: https://www.alphavantage.co/support/#api-key
+2. Sign up for free account (5 calls/min, 500/day)
+3. Set environment variable:
+```bash
+export ALPHA_VANTAGE_API_KEY="your_api_key_here"
+```
+
+### 3. Configure Settings
 Edit `server/config.yaml`:
 ```yaml
 email:
@@ -33,7 +46,7 @@ stock_lists:
   custom: [YOUR, STOCKS, HERE]
 ```
 
-### 3. Run the System
+### 4. Run the System
 
 **Interactive Menu (Recommended):**
 ```bash
@@ -92,7 +105,7 @@ server/
 - **News sentiment** (positive/negative/neutral)
 - **Price trajectory** (7-day and 30-day targets)
 
-### 2. Top Recommendations (50-Point Scoring)
+### 2. Top Recommendations (60-Point Scoring)
 Stocks scored based on:
 - Recommendation quality (10 pts)
 - Risk level (10 pts)
@@ -100,6 +113,7 @@ Stocks scored based on:
 - Volume ratio (5 pts)
 - **News sentiment** (10 pts)
 - **Trajectory prediction** (10 pts)
+- **RSI indicator** (10 pts) - NEW with Alpha Vantage
 
 ### 3. Configuration (config.yaml)
 
@@ -188,15 +202,74 @@ cd server
 uv run main.py
 ```
 
-The MCP server provides 8 tools:
+### Available MCP Tools
+
+#### Core Tools (Yahoo Finance)
 - `get_stock_info` - Real-time stock data
-- `get_buying_recommendation` - Buy/sell advice
-- `get_top_performers` - Best performing stocks
-- `get_price_trajectory` - Price predictions
-- `get_stocks_under_price` - Filter by price
-- `generate_daily_analysis_email` - Email reports
-- `send_email_notification` - Send emails
-- `save_daily_analysis_to_file` - Save reports
+- `get_buying_recommendation` - Buy/sell advice with technical analysis
+- `get_top_performers` - Best performing stocks from watchlist
+- `get_price_trajectory` - Price trend predictions
+- `get_stocks_under_price` - Filter by price range
+- `generate_daily_analysis_email` - Create email reports
+- `send_email_notification` - Send emails via SMTP
+- `save_daily_analysis_to_file` - Save reports as HTML
+
+#### Multi-Source Tools (Yahoo Finance + Alpha Vantage)
+- `get_multi_source_stock_data` - Compare data from both sources
+- `get_comprehensive_recommendation` - Enhanced recommendations with RSI
+- `compare_stock_sources` - Detailed side-by-side comparison
+
+### Multi-Source Data Features
+
+**Data Validation:**
+- Cross-verify prices between Yahoo Finance and Alpha Vantage
+- Detect discrepancies and data inconsistencies
+- Get data consistency ratings (High/Medium/Low)
+
+**RSI Technical Indicator:**
+- 14-day Relative Strength Index from Alpha Vantage
+- Automatic signals: Oversold (<30), Overbought (>70), Neutral (30-70)
+- Helps identify optimal entry/exit points
+
+**Consensus Recommendations:**
+- Combines Yahoo Finance technical analysis with Alpha Vantage RSI
+- Multi-signal confirmation for higher confidence
+- Ratings: Strong Buy, Buy, Hold, Wait
+
+**Example Usage:**
+```python
+# Compare data sources
+result = await get_multi_source_stock_data("AAPL")
+print(f"Price difference: {result['comparison']['price_difference_percent']}%")
+print(f"Data consistency: {result['comparison']['data_consistency']}")
+print(f"RSI: {result['alpha_vantage']['rsi']} ({result['alpha_vantage']['rsi_signal']})")
+
+# Get enhanced recommendation
+rec = await get_comprehensive_recommendation("TSLA", use_alpha_vantage=True)
+print(f"Consensus: {rec['consensus_recommendation']['overall']}")
+print(f"Confidence: {rec['consensus_recommendation']['confidence']}")
+
+# Validate data quality
+comp = await compare_stock_sources("NVDA")
+print(f"Reliability: {comp['summary']['overall_reliability']}")
+```
+
+### Alpha Vantage API Setup
+
+**Free Tier Limits:**
+- 5 API calls per minute
+- 500 API calls per day
+
+**Getting Started:**
+1. Sign up at https://www.alphavantage.co/support/#api-key
+2. Get your free API key
+3. Set environment variable: `export ALPHA_VANTAGE_API_KEY="your_key"`
+4. System falls back to Yahoo Finance if Alpha Vantage unavailable
+
+**Managing Rate Limits:**
+- Use `use_alpha_vantage=False` parameter when AV data isn't needed
+- Cache results for repeated queries
+- Consider premium tier for production ($49.99/month = 600 calls/min)
 
 ## Command Reference
 
@@ -226,11 +299,31 @@ The MCP server provides 8 tools:
 ## Requirements
 
 - Python 3.12+
-- yfinance - Stock data
+- yfinance - Stock data from Yahoo Finance
+- requests - Alpha Vantage API calls
 - pandas, numpy - Data processing
 - pyyaml - Configuration
 - schedule - Task scheduling
 - mcp - Model Context Protocol
+
+## What's New
+
+### Multi-Source Data Integration (Latest)
+- **Dual Data Sources**: Yahoo Finance + Alpha Vantage for cross-validation
+- **RSI Indicator**: 14-day Relative Strength Index for overbought/oversold signals
+- **Consensus Recommendations**: Combined analysis from multiple sources
+- **Data Validation**: Automatic discrepancy detection and consistency ratings
+- **Enhanced Scoring**: 60-point system (up from 50) with RSI factor
+- **CLI Integration**: All features (analyze, top N, historical) now use Alpha Vantage
+- **3 New MCP Tools**: Multi-source comparison, comprehensive recommendations, source validation
+
+### Benefits:
+- **Higher Accuracy**: Cross-verify data to catch errors
+- **Better Insights**: Access RSI and Alpha Vantage-exclusive metrics
+- **Increased Confidence**: Recommendations backed by multiple sources
+- **Reliability**: System works even if one source fails
+- **Flexibility**: Choose single or multi-source analysis
+- **CLI & MCP Support**: Both interfaces benefit from multi-source data
 
 ## Troubleshooting
 
@@ -247,8 +340,22 @@ The MCP server provides 8 tools:
 - Check config.yaml formatting
 - Ensure 2-step verification enabled
 
+**Alpha Vantage issues:**
+- Rate limit exceeded: Wait 60 seconds (5 calls/min limit)
+- "Demo key" limitations: Get your free API key
+- Price discrepancies: Check `latest_trading_day` field for data freshness
+
 ## Disclaimer
 
 This tool is for informational purposes only. Not financial advice. Always do your own research and consult with qualified financial advisors before making investment decisions.
 
-Data sources: Yahoo Finance (15-20 minute delay), yfinance news feeds.
+**Data sources:** 
+- Yahoo Finance (15-20 minute delay during market hours)
+- Alpha Vantage API (real-time and technical indicators)
+- News feeds from yfinance
+
+**Important Notes:**
+- Price discrepancies between sources may occur due to timing
+- RSI and technical indicators are tools, not guarantees
+- Multi-source validation increases confidence but doesn't eliminate risk
+- Free API tiers have rate limits - plan usage accordingly

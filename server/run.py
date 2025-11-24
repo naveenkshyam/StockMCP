@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """
 Stock Analysis System - Main Runner
 Provides easy access to all features with configuration support

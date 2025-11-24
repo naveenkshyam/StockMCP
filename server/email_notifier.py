@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """
 Email Notification Module for Stock Analysis
 Handles email generation and sending for daily stock reports
