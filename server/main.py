@@ -14,6 +14,128 @@ from alpha_vantage_client import (
 # Initialize FastMCP server
 mcp = FastMCP("stock-api")
 
+# Helper function for generating recommendation reasoning
+def generate_recommendation_reasoning(stock: dict, recommendation: dict, trajectory: dict = None) -> dict:
+    """
+    Generate detailed reasoning for why a stock is recommended for buy/sell
+    based on price movements, technical indicators, and trajectory
+    """
+    reasoning = {
+        'summary': '',
+        'key_factors': [],
+        'price_analysis': '',
+        'trajectory_insight': '',
+        'action_rationale': ''
+    }
+    
+    rec_type = recommendation.get('recommendation', 'Hold')
+    day_change = stock.get('day_change_percent', 0)
+    current_price = stock.get('current_price', 0)
+    risk = recommendation.get('risk_level', 'Medium')
+    
+    # Price Movement Analysis
+    if day_change > 5:
+        reasoning['price_analysis'] = f"Stock surged {day_change:.1f}% today, showing strong upward momentum. "
+        if rec_type in ['Wait for Pullback', 'Overextended - Wait']:
+            reasoning['price_analysis'] += "However, this rapid increase suggests overbought conditions. Consider waiting for a pullback to enter at better prices."
+        else:
+            reasoning['price_analysis'] += "This momentum could continue if supported by strong fundamentals."
+    elif day_change > 2:
+        reasoning['price_analysis'] = f"Stock gained {day_change:.1f}% today, indicating positive sentiment. "
+        reasoning['price_analysis'] += "Moderate upward movement suggests healthy price action without being overextended."
+    elif day_change < -5:
+        reasoning['price_analysis'] = f"Stock dropped {abs(day_change):.1f}% today, creating a potential buying opportunity. "
+        if rec_type in ['Strong Buy', 'Buy']:
+            reasoning['price_analysis'] += "This dip could be an excellent entry point for long-term holders."
+    elif day_change < -2:
+        reasoning['price_analysis'] = f"Stock declined {abs(day_change):.1f}% today. "
+        reasoning['price_analysis'] += "Minor pullback may present a better entry point than previous levels."
+    else:
+        reasoning['price_analysis'] = f"Stock moved {day_change:+.1f}% today, showing relatively stable price action. "
+        reasoning['price_analysis'] += "Low volatility suggests consolidation phase."
+    
+    # Trajectory Insight
+    if trajectory and trajectory.get('trend'):
+        trend = trajectory.get('trend', 'Unknown')
+        momentum = trajectory.get('momentum', {})
+        prediction = trajectory.get('prediction', {})
+        
+        momentum_signal = momentum.get('signal', 'Neutral')
+        predicted_direction = prediction.get('direction', 'Neutral')
+        confidence = prediction.get('confidence', 'Low')
+        
+        reasoning['trajectory_insight'] = f"30-day trajectory shows {trend} pattern with {momentum_signal} momentum. "
+        reasoning['trajectory_insight'] += f"Prediction: {predicted_direction} movement with {confidence} confidence. "
+        
+        if trend == 'Uptrend' and predicted_direction == 'Upward':
+            reasoning['trajectory_insight'] += "Strong technical setup favors continued upside."
+        elif trend == 'Downtrend' and predicted_direction == 'Downward':
+            reasoning['trajectory_insight'] += "Bearish technical pattern suggests caution."
+        elif trend == 'Sideways':
+            reasoning['trajectory_insight'] += "Consolidation phase - waiting for breakout direction."
+    
+    # Action Rationale
+    if rec_type == 'Strong Buy':
+        reasoning['action_rationale'] = f"STRONG BUY: Stock is trading below key support levels at ${current_price}. "
+        if day_change < 0:
+            reasoning['action_rationale'] += f"Today's {abs(day_change):.1f}% dip presents an excellent entry opportunity. "
+        reasoning['action_rationale'] += f"Risk level is {risk}. Consider position sizing accordingly."
+        reasoning['key_factors'] = [
+            'Trading below 20-day moving average',
+            'Recent price decline creates value opportunity',
+            'Technical indicators suggest oversold conditions',
+            'Strong upside potential from current levels'
+        ]
+        
+    elif rec_type == 'Buy':
+        reasoning['action_rationale'] = f"BUY: Stock shows positive signals at ${current_price}. "
+        if day_change > 0:
+            reasoning['action_rationale'] += f"Today's {day_change:.1f}% gain confirms positive momentum. "
+        reasoning['action_rationale'] += f"Risk level is {risk}. Good entry point for building position."
+        reasoning['key_factors'] = [
+            'Favorable technical setup',
+            'Trading near support levels',
+            'Positive momentum indicators',
+            'Acceptable risk-reward ratio'
+        ]
+        
+    elif rec_type == 'Hold':
+        reasoning['action_rationale'] = f"HOLD: Stock at ${current_price} doesn't present clear entry opportunity. "
+        reasoning['action_rationale'] += "Wait for more definitive signals before taking action. "
+        reasoning['key_factors'] = [
+            'Neutral technical indicators',
+            'Waiting for trend confirmation',
+            'No urgent catalysts',
+            'Better opportunities may emerge'
+        ]
+        
+    elif rec_type == 'Wait for Pullback':
+        reasoning['action_rationale'] = f"WAIT: Stock surged {day_change:.1f}% to ${current_price}. "
+        reasoning['action_rationale'] += "Overbought conditions suggest waiting for consolidation before entry. "
+        reasoning['key_factors'] = [
+            f'Rapid {day_change:.1f}% increase indicates overbought',
+            'High risk of short-term pullback',
+            'Better entry prices likely after consolidation',
+            'Wait for 3-5% retracement'
+        ]
+        
+    elif rec_type == 'Overextended - Wait':
+        reasoning['action_rationale'] = f"OVEREXTENDED: Stock at ${current_price} has risen too far too fast. "
+        reasoning['action_rationale'] += "Wait for significant pullback before considering entry. "
+        reasoning['key_factors'] = [
+            'Trading far above moving averages',
+            'Momentum unsustainable at current levels',
+            'High probability of correction',
+            'Wait for 10%+ pullback'
+        ]
+    
+    # Generate summary
+    reasoning['summary'] = f"{rec_type} recommendation for {stock.get('company', stock.get('ticker'))} "
+    reasoning['summary'] += f"at ${current_price} (${day_change:+.2f}% today). "
+    reasoning['summary'] += f"{risk} risk. " + reasoning['action_rationale'][:100] + "..."
+    
+    return reasoning
+
 @mcp.tool()
 async def get_stock_info(ticker: str) -> dict:
     """
@@ -468,28 +590,72 @@ async def get_stocks_under_price(max_price: float = 10.0, min_price: float = 1.0
         return {"error": str(e)}
 
 @mcp.tool()
-async def generate_daily_analysis_email(
+async def get_top_stock_recommendations_in_range(
     max_price: float = 10.0,
     min_price: float = 1.0,
-    recipient_email: str = "",
-    include_recommendations: bool = True
+    top_n: int = 10,
+    use_extended_watchlist: bool = True
 ) -> dict:
     """
-    Generate a formatted daily analysis email content for stocks within specified price range.
+    Get top N stock recommendations within a specified price range with detailed analysis.
     Args:
-        max_price (float): Maximum stock price to include (default: $10.00)
-        min_price (float): Minimum stock price to include (default: $1.00)
-        recipient_email (str): Email address to send to (required)
-        include_recommendations (bool): Include buying recommendations (default: True)
+        max_price (float): Maximum stock price to filter (default: $10.00)
+        min_price (float): Minimum stock price to filter (default: $1.00)
+        top_n (int): Number of top recommendations to return (default: 10)
+        use_extended_watchlist (bool): If True, searches 60+ stocks from extended watchlist. 
+                                       If False, only uses configured stocks from config.yaml (default: True)
     Returns:
-        dict: Email content and metadata ready to send
+        dict: Top N stock recommendations with buying recommendations, entry points, and analysis
     """
     try:
-        if not recipient_email:
-            return {"error": "Recipient email address is required"}
-        
-        # Get stocks within price range
-        stocks_data = await get_stocks_under_price(max_price=max_price, min_price=min_price, limit=20)
+        # Determine which stocks to analyze
+        if use_extended_watchlist:
+            # Get stocks from extended watchlist (60+ stocks)
+            stocks_data = await get_stocks_under_price(max_price=max_price, min_price=min_price, limit=50)
+        else:
+            # Use only configured stocks from config.yaml (7 default stocks)
+            from config_manager import ConfigManager
+            config = ConfigManager()
+            config_stocks = config.get_stock_list('default')
+            
+            # Manually filter configured stocks by price
+            affordable_stocks = []
+            for ticker in config_stocks:
+                try:
+                    stock = yf.Ticker(ticker)
+                    info = stock.info
+                    hist = stock.history(period="5d")
+                    
+                    if hist.empty:
+                        continue
+                    
+                    current_price = info.get('currentPrice', hist['Close'].iloc[-1])
+                    
+                    if min_price <= current_price <= max_price:
+                        previous_close = hist['Close'].iloc[-2] if len(hist) > 1 else current_price
+                        day_change = current_price - previous_close
+                        day_change_pct = (day_change / previous_close * 100) if previous_close else 0
+                        
+                        affordable_stocks.append({
+                            'ticker': ticker,
+                            'company': info.get('shortName', ticker),
+                            'current_price': round(current_price, 2),
+                            'previous_close': round(previous_close, 2),
+                            'day_change': round(day_change, 2),
+                            'day_change_percent': round(day_change_pct, 2),
+                            'volume': int(hist['Volume'].iloc[-1]),
+                            'market_cap': info.get('marketCap', 0),
+                            'sector': info.get('sector', 'N/A'),
+                            'industry': info.get('industry', 'N/A')
+                        })
+                except Exception as e:
+                    continue
+            
+            stocks_data = {
+                "stocks": affordable_stocks,
+                "total_found": len(affordable_stocks),
+                "source": "config.yaml default list"
+            }
         
         if "error" in stocks_data:
             return stocks_data
@@ -502,15 +668,114 @@ async def generate_daily_analysis_email(
                 "message": "Try adjusting the price range"
             }
         
-        # Prepare top movers data if recommendations are included
+        # Sort by daily change percentage (top performers)
+        sorted_stocks = sorted(stocks, key=lambda x: x['day_change_percent'], reverse=True)
+        
+        # Get top N stocks
+        top_stocks = sorted_stocks[:min(top_n, len(sorted_stocks))]
+        
+        # Get detailed recommendations for each
+        recommendations = []
+        for stock in top_stocks:
+            try:
+                # Get buying recommendation
+                rec = await get_buying_recommendation(stock['ticker'])
+                if "error" in rec:
+                    continue
+                
+                # Get price trajectory prediction
+                trajectory = await get_price_trajectory(stock['ticker'], days=30)
+                
+                # Generate detailed reasoning for recommendation
+                reasoning = generate_recommendation_reasoning(
+                    stock=stock,
+                    recommendation=rec,
+                    trajectory=trajectory if "error" not in trajectory else None
+                )
+                
+                recommendations.append({
+                    'ticker': stock['ticker'],
+                    'company': stock['company'],
+                    'current_price': stock['current_price'],
+                    'day_change_percent': stock['day_change_percent'],
+                    'volume': stock['volume'],
+                    'recommendation': rec['recommendation'],
+                    'risk_level': rec['risk_level'],
+                    'entry_points': rec['entry_points'],
+                    'stop_loss': rec['stop_loss'],
+                    'key_levels': rec['key_levels'],
+                    'analysis': rec['analysis'],
+                    'trajectory': {
+                        'trend': trajectory.get('trend', 'Unknown') if trajectory and "error" not in trajectory else 'Unknown',
+                        'prediction': trajectory.get('prediction', {}) if trajectory and "error" not in trajectory else {},
+                        'momentum': trajectory.get('momentum', {}) if trajectory and "error" not in trajectory else {}
+                    },
+                    'recommendation_reasoning': reasoning
+                })
+            except Exception as e:
+                continue
+        
+        return {
+            "price_range": f"${min_price} - ${max_price}",
+            "requested_count": top_n,
+            "returned_count": len(recommendations),
+            "stock_source": "Extended watchlist (60+ stocks)" if use_extended_watchlist else "Config default list (7 stocks)",
+            "total_stocks_analyzed": stocks_data.get('total_found', len(stocks)),
+            "recommendations": recommendations,
+            "generated_at": datetime.now().isoformat(),
+            "note": f"Top {len(recommendations)} stock recommendations based on daily performance within your price range"
+        }
+    
+    except Exception as e:
+        return {"error": str(e)}
+
+@mcp.tool()
+async def generate_daily_analysis_email(
+    max_price: float = 10.0,
+    min_price: float = 1.0,
+    recipient_email: str = "",
+    include_recommendations: bool = True,
+    top_n_recommendations: int = 10
+) -> dict:
+    """
+    Generate a formatted daily analysis email content for stocks within specified price range.
+    Args:
+        max_price (float): Maximum stock price to include (default: $10.00)
+        min_price (float): Minimum stock price to include (default: $1.00)
+        recipient_email (str): Email address to send to (required)
+        include_recommendations (bool): Include buying recommendations (default: True)
+        top_n_recommendations (int): Number of top stock recommendations to include (default: 10)
+    Returns:
+        dict: Email content and metadata ready to send
+    """
+    try:
+        if not recipient_email:
+            return {"error": "Recipient email address is required"}
+        
+        # Get stocks within price range (fetch more to have options)
+        stocks_data = await get_stocks_under_price(max_price=max_price, min_price=min_price, limit=50)
+        
+        if "error" in stocks_data:
+            return stocks_data
+        
+        stocks = stocks_data['stocks']
+        
+        if not stocks:
+            return {
+                "error": f"No stocks found between ${min_price} and ${max_price}",
+                "message": "Try adjusting the price range"
+            }
+        
+        # Prepare top N recommendations if included
         top_movers_data = []
         if include_recommendations:
-            # Get top 3 gainers and losers
+            # Get top N stocks by daily change (both gainers and some interesting movers)
             sorted_by_change = sorted(stocks, key=lambda x: x['day_change_percent'], reverse=True)
-            top_gainers = sorted_by_change[:3]
-            top_losers = sorted_by_change[-3:] if len(sorted_by_change) >= 3 else []
             
-            for stock in top_gainers + top_losers:
+            # Get top N stocks to analyze
+            stocks_to_analyze = sorted_by_change[:top_n_recommendations]
+            
+            for stock in stocks_to_analyze:
                 rec = await get_buying_recommendation(stock['ticker'])
                 top_movers_data.append({
                     'stock': stock,

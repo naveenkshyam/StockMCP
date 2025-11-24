@@ -1,7 +1,7 @@
 # Stock Analysis System - Quick Start Guide
 
 ## Overview
-Advanced stock analysis system with news sentiment integration, smart recommendations, and automated reporting.
+Advanced stock analysis system with news sentiment integration, smart recommendations, automated reporting, and **multi-source data validation** (Yahoo Finance + Alpha Vantage).
 
 ## Features
 ✅ Real-time stock analysis with buy/sell recommendations  
@@ -11,6 +11,43 @@ Advanced stock analysis system with news sentiment integration, smart recommenda
 ✅ Email notifications (HTML & text)  
 ✅ Automated daily/weekly reports  
 ✅ Configurable stock lists and settings  
+✅ **Multi-source data validation** (Yahoo Finance + Alpha Vantage)  
+✅ **Flexible stock source options** (configured lists vs extended watchlist)  
+
+## Stock Source Options
+
+### Two Ways to Search for Stocks:
+
+#### 1. **Configured Stocks Only** (Focused Analysis)
+- Uses only stocks defined in your `config.yaml` file
+- Default: 7 carefully selected stocks (NVDA, AMD, INTC, F, NOK, BAC, WFC)
+- Best for: Tracking specific stocks you care about
+- Faster execution, focused results
+
+#### 2. **Extended Watchlist** (Broad Coverage)
+- Searches 60+ stocks from a comprehensive watchlist
+- Includes major stocks + affordable penny stocks
+- Best for: Discovering new opportunities across the market
+- More comprehensive, takes longer to analyze
+
+### Using in MCP Server
+```python
+# Use configured stocks only (7 stocks from config.yaml)
+result = await get_top_stock_recommendations_in_range(
+    max_price=10.0,
+    min_price=1.0,
+    top_n=10,
+    use_extended_watchlist=False  # Configured stocks only
+)
+
+# Use extended watchlist (60+ stocks)
+result = await get_top_stock_recommendations_in_range(
+    max_price=10.0,
+    min_price=1.0,
+    top_n=10,
+    use_extended_watchlist=True  # Extended watchlist (default)
+)
+```
 
 ## Quick Start
 
