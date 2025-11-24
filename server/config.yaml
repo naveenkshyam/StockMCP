@@ -4,7 +4,7 @@
 # Email Configuration
 email:
   from: "nkfriend4ever.79@gmail.com"
-  password: "NavCat2021!"  # Get from https://myaccount.google.com/apppasswords
+  password: "Password123"  # Get from https://myaccount.google.com/apppasswords
   to: "naveenkshyam@gmail.com"
   smtp_server: "smtp.gmail.com"
   smtp_port: 587
