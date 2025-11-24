@@ -1,0 +1,148 @@
+# Stock Analysis Configuration File
+# Edit this file to customize your analysis settings
+
+# Email Configuration
+email:
+  from: "nkfriend4ever.79@gmail.com"
+  password: "NavCat2021!"  # Get from https://myaccount.google.com/apppasswords
+  to: "naveenkshyam@gmail.com"
+  smtp_server: "smtp.gmail.com"
+  smtp_port: 587
+
+# Stock Lists - Customize your watchlists
+stock_lists:
+  # Main watchlist for general analysis
+  default:
+   
+    - NVDA
+    - AMD
+    - INTC
+    - F
+    - NOK
+    - BAC
+    - WFC
+    
+  # Tech stocks
+  tech:
+    - NVDA
+    - AMD
+    - INTC
+    - TSLA
+    - CRM
+    
+  # Penny stocks / Low price stocks
+  penny:
+    - ABTS
+    - PLUG
+    - NIO
+    - SOFI
+    - RIVN
+    - LCID
+    - SNDL
+    - GSAT
+    - HIMS
+    - BLNK
+    
+  # Finance sector
+  finance:
+    - BAC
+    - WFC
+    - JPM
+    - GS
+    - MS
+    - C
+    - PYPL
+    - SQ
+    - V
+    - MA
+    
+  # EV and Clean Energy
+  ev_clean:
+    - TSLA
+    - RIVN
+    - LCID
+    - NIO
+    - PLUG
+    - BLNK
+    - CHPT
+    - ENPH
+    - SEDG
+    - RUN
+    
+  # Custom watchlist - Add your own stocks here
+  custom:
+    - ABTS
+    - F
+    - NOK
+    - AMC
+    - SOFI
+
+# Analysis Settings
+analysis:
+  # Price range filters
+  price_filter:
+    min_price: 1.0
+    max_price: 10.0
+  
+  # Historical analysis settings
+  historical:
+    period: "3mo"  # Options: 1mo, 3mo, 6mo, 1y
+    min_performance: 0.0  # Minimum % gain to include
+  
+  # Risk assessment thresholds
+  risk:
+    high_volatility: 5.0  # % daily volatility
+    medium_volatility: 3.0
+    small_cap: 100000000  # $100M
+    mid_cap: 1000000000   # $1B
+  
+  # News analysis settings
+  news:
+    enabled: true
+    max_articles: 5  # Number of recent news articles to analyze
+    sentiment_weight: 0.3  # How much news affects recommendation (0-1)
+    keywords:
+      positive:
+        - "earnings beat"
+        - "revenue growth"
+        - "partnership"
+        - "acquisition"
+        - "innovation"
+        - "breakthrough"
+        - "expansion"
+        - "profit"
+        - "upgrade"
+        - "bullish"
+      negative:
+        - "lawsuit"
+        - "loss"
+        - "decline"
+        - "warning"
+        - "investigation"
+        - "downgrade"
+        - "bearish"
+        - "debt"
+        - "scandal"
+        - "layoffs"
+
+# Scheduling Settings
+scheduler:
+  # Daily report settings
+  daily:
+    enabled: false
+    time: "09:00"  # HH:MM format
+    watchlist: "default"  # Which stock list to use
+  
+  # Weekly report settings
+  weekly:
+    enabled: false
+    day: "monday"  # Day of week
+    time: "08:00"
+    watchlist: "default"
+
+# Output Settings
+output:
+  save_reports: true
+  report_directory: "reports"
+  include_charts: false  # Future feature
+  format: "both"  # Options: html, text, both
