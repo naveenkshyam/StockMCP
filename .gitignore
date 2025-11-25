@@ -5,8 +5,8 @@ __pycache__/
 *.so
 .Python
 
-# Virtual environments
-.venv/
+# Virtual environments (using parent directory .venv)
+# .venv is in ML_Python_examples/.venv
 venv/
 ENV/
 env/
@@ -34,6 +34,5 @@ htmlcov/
 Thumbs.db
 
 # Project specific
-server/.venv/
 *.log
 .env

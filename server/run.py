@@ -8,7 +8,11 @@ import os
 
 # Get the Python interpreter path (works for both venv and system Python)
 def get_python_path():
-    """Get the correct Python interpreter path"""
+    """Get the correct Python interpreter path from shared venv"""
+    # Use shared virtual environment in parent directory
+    venv_python = "/home/nshyam/lambda-examples/ML_Python_examples/.venv/bin/python3"
+    if os.path.exists(venv_python):
+        return venv_python
     return sys.executable
 
 def print_banner():

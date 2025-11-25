@@ -30,17 +30,19 @@ Advanced stock analysis system with **Pinecone vector database tracking**, AI-po
 
 ## 🔧 Installation
 
-### 1. Clone & Setup
+### 1. Activate Shared Virtual Environment
 ```bash
-cd StockMCP/server
-python3 -m venv .venv
+cd ML_Python_examples
 source .venv/bin/activate  # Linux/Mac
 # or
 .venv\Scripts\activate  # Windows
 ```
 
+> **Note**: This project uses a shared virtual environment located at `ML_Python_examples/.venv` that can be reused across multiple projects in the workspace.
+
 ### 2. Install Dependencies
 ```bash
+cd StockMCP/server
 pip install -e .
 ```
 
