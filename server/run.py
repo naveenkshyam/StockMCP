@@ -6,6 +6,11 @@ Provides easy access to all features with configuration support
 import sys
 import os
 
+# Get the Python interpreter path (works for both venv and system Python)
+def get_python_path():
+    """Get the correct Python interpreter path"""
+    return sys.executable
+
 def print_banner():
     """Print welcome banner"""
     print("\n" + "="*70)
@@ -17,15 +22,15 @@ def print_menu():
     """Print main menu"""
     print("Available Features:")
     print()
-    print("1. Analyze Stocks with Recommendations")
-    print("   • Real-time analysis with buy/sell recommendations")
-    print("   • News sentiment integration")
-    print("   • Entry points and stop loss calculations")
+    print("1. Search ALL Stocks ($1-$10) - Top 10 Recommendations")
+    print("   • Searches 60+ stocks in extended watchlist")
+    print("   • Returns top 10 with full analysis & trajectory")
+    print("   • Best for comprehensive market scan")
     print()
-    print("2. Top N Recommendations (Scored & Ranked)")
-    print("   • Get best stocks based on multi-factor scoring")
-    print("   • Includes news sentiment and trajectory prediction")
-    print("   • Customizable stock lists from config")
+    print("2. Search Configured Stocks - Top N Recommendations")
+    print("   • Uses stock lists from config.yaml (default: 7 stocks)")
+    print("   • Customizable: tech, penny, finance, ev_clean, custom")
+    print("   • Faster, focused analysis")
     print()
     print("3. Historical Performance (3-Month)")
     print("   • Track stock performance over 3 months")
@@ -49,36 +54,55 @@ def print_menu():
     print("   • Test all features")
     print("   • Quick smoke test available")
     print()
+    print("8. Save Recommendations to Pinecone")
+    print("   • Store today's recommendations in vector database")
+    print("   • Compare with tomorrow's recommendations")
+    print("   • Track recommendation changes over time")
+    print()
     print("0. Exit")
     print()
 
-def run_analyze():
-    """Run stock analysis feature"""
+def run_analyze_all_stocks():
+    """Run comprehensive search across ALL 60+ stocks"""
     print("\n" + "-"*70)
-    print("STOCK ANALYSIS")
+    print("SEARCH ALL STOCKS ($1-$10) - TOP 10 RECOMMENDATIONS")
     print("-"*70 + "\n")
     
-    print("Options:")
-    print("1. Analyze specific tickers (e.g., AAPL,MSFT,TSLA)")
-    print("2. Use predefined list from config (default, tech, penny, finance, ev_clean, custom)")
-    print("3. Get top N recommendations")
+    print("This will search 60+ stocks in the extended watchlist")
+    print("Price range: $1.00 - $10.00")
+    print()
     
-    choice = input("\nSelect option (1-3): ").strip()
+    top_n = input("How many top recommendations (default 10): ").strip() or "10"
+    min_price = input("Minimum price (default $1.00): ").strip() or "1.00"
+    max_price = input("Maximum price (default $10.00): ").strip() or "10.00"
     
-    if choice == "1":
-        tickers = input("Enter tickers (comma-separated): ").strip()
-        cmd = f"python feature_manager.py analyze --tickers {tickers}"
-    elif choice == "2":
-        print("\nAvailable lists: default, tech, penny, finance, ev_clean, custom")
-        list_name = input("Enter list name: ").strip() or "default"
-        cmd = f"python feature_manager.py analyze --list {list_name}"
-    elif choice == "3":
-        list_name = input("Enter list name (or press Enter for default): ").strip() or "default"
-        top_n = input("How many top recommendations (default 20): ").strip() or "20"
-        cmd = f"python feature_manager.py analyze --list {list_name} --top {top_n}"
-    else:
-        print("Invalid option")
-        return
+    cmd = f"{get_python_path()} features/feature_manager.py search-all --top {top_n} --min-price {min_price} --max-price {max_price}"
+    
+    # Ask about news
+    use_news = input("\nInclude news analysis? (Y/n): ").strip().lower()
+    if use_news == 'n':
+        cmd += " --no-news"
+    
+    # Ask about saving
+    save = input("Save results to file? (y/N): ").strip().lower()
+    if save == 'y':
+        filename = input("Enter filename suffix (e.g., 'all_stocks_report'): ").strip() or "all_stocks"
+        cmd += f" --save {filename}"
+    
+    print(f"\nRunning: {cmd}\n")
+    os.system(cmd)
+
+def run_analyze_configured():
+    """Run analysis on configured stocks from config.yaml"""
+    print("\n" + "-"*70)
+    print("SEARCH CONFIGURED STOCKS - TOP N RECOMMENDATIONS")
+    print("-"*70 + "\n")
+    
+    print("Available lists: default, tech, penny, finance, ev_clean, custom")
+    list_name = input("Enter list name (default): ").strip() or "default"
+    top_n = input("How many top recommendations (default 20): ").strip() or "20"
+    
+    cmd = f"{get_python_path()} features/feature_manager.py analyze --list {list_name} --top {top_n}"
     
     # Ask about news
     use_news = input("\nInclude news analysis? (Y/n): ").strip().lower()
@@ -108,10 +132,10 @@ def run_historical():
     
     if choice == "1":
         tickers = input("Enter tickers (comma-separated): ").strip()
-        cmd = f"python feature_manager.py historical --tickers {tickers}"
+        cmd = f"{get_python_path()} features/feature_manager.py historical --tickers {tickers}"
     elif choice == "2":
         list_name = input("Enter list name (default, tech, penny, etc.): ").strip() or "default"
-        cmd = f"python feature_manager.py historical --list {list_name}"
+        cmd = f"{get_python_path()} features/feature_manager.py historical --list {list_name}"
     else:
         print("Invalid option")
         return
@@ -142,7 +166,7 @@ def run_email():
     use_config = input("Use config.yaml for email settings? (Y/n): ").strip().lower() != 'n'
     
     if use_config:
-        cmd = "python feature_manager.py email"
+        cmd = f"{get_python_path()} features/feature_manager.py email"
         from config_manager import get_config
         config = get_config()
         email_from = config.get_email_from()
@@ -159,7 +183,7 @@ def run_email():
         email_password = input("Gmail App Password: ").strip()
         email_to = input("Recipient email: ").strip()
         
-        cmd = f"python feature_manager.py email --email-from {email_from} --email-password {email_password} --email-to {email_to}"
+        cmd = f"{get_python_path()} features/feature_manager.py email --email-from {email_from} --email-password {email_password} --email-to {email_to}"
     
     list_name = input("\nStock list (default, tech, penny, etc.): ").strip() or "default"
     cmd += f" --list {list_name}"
@@ -181,11 +205,11 @@ def run_schedule():
     
     if choice == "1":
         time_str = input("Time (HH:MM, e.g., 09:00): ").strip()
-        cmd = f"python feature_manager.py schedule --schedule-type daily --schedule-time {time_str}"
+        cmd = f"{get_python_path()} features/feature_manager.py schedule --schedule-type daily --schedule-time {time_str}"
     elif choice == "2":
         day = input("Day (monday-sunday): ").strip().lower()
         time_str = input("Time (HH:MM): ").strip()
-        cmd = f"python feature_manager.py schedule --schedule-type weekly --schedule-day {day} --schedule-time {time_str}"
+        cmd = f"{get_python_path()} features/feature_manager.py schedule --schedule-type weekly --schedule-day {day} --schedule-time {time_str}"
     else:
         print("Invalid option")
         return
@@ -236,6 +260,43 @@ def edit_config():
     input("Press Enter to open editor...")
     os.system(f"{editor} {config_path}")
 
+def run_save_to_pinecone():
+    """Save stock recommendations to Pinecone vector database"""
+    print("\n" + "-"*70)
+    print("SAVE RECOMMENDATIONS TO PINECONE")
+    print("-"*70 + "\n")
+    
+    print("This will save today's recommendations to Pinecone vector database")
+    print("allowing you to compare with future recommendations.")
+    print()
+    
+    print("Options:")
+    print("1. Save ALL stocks search ($1-$10, top 10)")
+    print("2. Save configured stocks search (from config.yaml)")
+    
+    choice = input("\nSelect option (1-2): ").strip()
+    
+    if choice == "1":
+        top_n = input("How many top recommendations to save (default 10): ").strip() or "10"
+        min_price = input("Minimum price (default $1.00): ").strip() or "1.00"
+        max_price = input("Maximum price (default $10.00): ").strip() or "10.00"
+        
+        cmd = f"{get_python_path()} features/feature_manager.py save-pinecone --mode all --top {top_n} --min-price {min_price} --max-price {max_price}"
+    
+    elif choice == "2":
+        print("\nAvailable lists: default, tech, penny, finance, ev_clean, custom")
+        list_name = input("Enter list name (default): ").strip() or "default"
+        top_n = input("How many top recommendations to save (default 20): ").strip() or "20"
+        
+        cmd = f"{get_python_path()} features/feature_manager.py save-pinecone --mode config --list {list_name} --top {top_n}"
+    
+    else:
+        print("Invalid option")
+        return
+    
+    print(f"\nRunning: {cmd}\n")
+    os.system(cmd)
+
 def run_tests():
     """Run test suite"""
     print("\n" + "-"*70)
@@ -249,9 +310,9 @@ def run_tests():
     choice = input("\nSelect (1-2): ").strip()
     
     if choice == "1":
-        os.system("python test_all_features.py --quick")
+        os.system(f"{get_python_path()} test_all_features.py --quick")
     elif choice == "2":
-        os.system("python test_all_features.py")
+        os.system(f"{get_python_path()} test_all_features.py")
     else:
         print("Invalid option")
 
@@ -263,15 +324,15 @@ def main():
         print_banner()
         print_menu()
         
-        choice = input("Select feature (0-7): ").strip()
+        choice = input("Select feature (0-8): ").strip()
         
         if choice == "0":
             print("\nGoodbye!\n")
             break
         elif choice == "1":
-            run_analyze()
+            run_analyze_all_stocks()
         elif choice == "2":
-            run_analyze()  # Same as 1, but user would select option 3
+            run_analyze_configured()
         elif choice == "3":
             run_historical()
         elif choice == "4":
@@ -282,8 +343,10 @@ def main():
             edit_config()
         elif choice == "7":
             run_tests()
+        elif choice == "8":
+            run_save_to_pinecone()
         else:
-            print("\n⚠ Invalid choice. Please select 0-7.\n")
+            print("\n⚠ Invalid choice. Please select 0-8.\n")
             input("Press Enter to continue...")
         
         if choice != "0":

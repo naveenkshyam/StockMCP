@@ -1,361 +1,423 @@
-# Stock Analysis System
+# Stock Analysis MCP Server
 
-Advanced stock analysis system with **multi-source data validation**, news sentiment integration, smart recommendations, and automated reporting.
+Advanced stock analysis system with **Pinecone vector database tracking**, AI-powered recommendations, news sentiment analysis, and automated reporting. Built for Python 3.13 with FastMCP.
 
-## Features
+## 🚀 Features
 
-✅ **Real-time Stock Analysis** - Buy/sell recommendations with entry/exit points  
-✅ **Multi-Source Data Validation** - Cross-verify data from Yahoo Finance + Alpha Vantage  
-✅ **RSI Technical Indicator** - Identify overbought/oversold conditions  
-✅ **Consensus Recommendations** - Combined signals from multiple data sources  
-✅ **News Sentiment Integration** - Analyzes news to predict price trajectory  
-✅ **Top N Recommendations** - Multi-factor scoring system (50 points)  
-✅ **Historical Analysis** - 3-month performance tracking with trends  
-✅ **Email Reports** - HTML and text format notifications  
-✅ **Automated Scheduling** - Daily/weekly automatic reports  
-✅ **Configurable Lists** - Pre-defined watchlists (tech, penny, finance, EV, custom)  
-✅ **MCP Server** - Model Context Protocol integration for AI assistants
+### Core Capabilities
+- ✅ **Real-time Stock Analysis** - Buy/sell recommendations with risk assessment
+- ✅ **Pinecone Vector Database** - Track recommendations day-to-day with hybrid embeddings
+- ✅ **News Sentiment Analysis** - AI-powered news analysis for trajectory prediction
+- ✅ **Smart Recommendations** - 50-point scoring system with multiple factors
+- ✅ **Historical Tracking** - Compare today vs yesterday, track changes over time
+- ✅ **Automated Reports** - Email notifications with HTML formatting
+- ✅ **FastMCP Server** - 11 MCP tools for AI assistant integration
+- ✅ **Configurable Watchlists** - Tech, penny stocks, finance, EV, custom lists
 
-## Quick Start
+### What Makes This Unique
+**Pinecone Integration**: Unlike traditional stock trackers, this system saves recommendations to a vector database so you can:
+- Compare today's recommendations with yesterday's
+- Track how recommendations evolve over time
+- Filter out stocks with no significant changes
+- Prevent duplicate saves for same-day analysis
+- Build historical patterns of recommendation accuracy
 
-### 1. Setup Environment
+## 📋 Requirements
+
+- **Python 3.13+** (optimized for latest Python features)
+- **Pinecone Account** (free tier: 2M vectors, sufficient for daily tracking)
+- **Gmail** (optional, for email reports)
+
+## 🔧 Installation
+
+### 1. Clone & Setup
 ```bash
-cd server
-source .venv/bin/activate
-pip install requests  # For Alpha Vantage API
+cd StockMCP/server
+python3 -m venv .venv
+source .venv/bin/activate  # Linux/Mac
+# or
+.venv\Scripts\activate  # Windows
 ```
 
-### 2. Get Alpha Vantage API Key (Optional but Recommended)
-For multi-source data validation and RSI indicators:
-1. Visit: https://www.alphavantage.co/support/#api-key
-2. Sign up for free account (5 calls/min, 500/day)
-3. Set environment variable:
+### 2. Install Dependencies
 ```bash
-export ALPHA_VANTAGE_API_KEY="your_api_key_here"
+pip install -e .
 ```
 
-### 3. Configure Settings
+This installs:
+- `mcp[cli]>=1.8.1` - FastMCP server framework
+- `yfinance>=0.2.61` - Yahoo Finance API
+- `pandas>=2.2.0` - Data processing
+- `numpy>=2.0.0` - Numerical computations
+- `pinecone>=8.0.0` - Vector database
+- `sentence-transformers>=5.0.0` - Text embeddings (80MB model)
+- `schedule>=1.2.0` - Task scheduling
+- `pyyaml>=6.0` - Configuration management
+
+### 3. Configure (Optional)
 Edit `server/config.yaml`:
 ```yaml
 email:
+  enabled: true
   from: "your-email@gmail.com"
   password: "your-gmail-app-password"
   to: "recipient@example.com"
 
+price_filters:
+  min_price: 1.0
+  max_price: 10.0
+
 stock_lists:
-  custom: [YOUR, STOCKS, HERE]
+  custom: [YOUR, TICKERS, HERE]
 ```
 
-### 4. Run the System
+## 🎯 Quick Start
 
-**Interactive Menu (Recommended):**
+### Interactive Menu (Easiest)
 ```bash
-./start.sh
-# or
-python run.py
+cd server
+python3 run.py
 ```
 
-**Command Line:**
+**Menu Options:**
+1. **Search ALL Stocks ($1-$10)** - Analyzes 60+ stocks, returns top 10 with comparisons
+2. **Search Configured Stocks** - Uses your config.yaml watchlist
+3. Historical Performance (3-Month)
+4. Send Email Report
+5. Schedule Automatic Reports
+6. Configure Settings
+7. Run Tests
+8. **Save to Pinecone** - Save today's recommendations for tracking ⭐
+
+### Command Line
 ```bash
-# Analyze top 20 penny stocks
-python feature_manager.py analyze --list penny --top 20
+# Search all 60+ stocks and save top 10 to Pinecone
+python3 features/feature_manager.py search-all --top 10 --min-price 1.0 --max-price 10.0
 
-# Historical performance (15%+ gains)
-python feature_manager.py historical --min-performance 15
+# Save recommendations to Pinecone
+python3 features/feature_manager.py save-pinecone --mode all --top 10
 
-# Send email report
-python feature_manager.py email --list tech
+# Analyze configured stocks
+python3 features/feature_manager.py analyze --list penny --top 20
 
-# Schedule daily reports at 9 AM
-python feature_manager.py schedule --schedule-type daily --schedule-time 09:00
+# Historical analysis
+python3 features/feature_manager.py historical --min-performance 15
+
+# Email report
+python3 features/feature_manager.py email --list tech
 ```
 
-**Run Tests:**
+## 🗄️ Pinecone Vector Database
+
+### What Gets Saved?
+Each stock recommendation becomes a **768-dimensional hybrid embedding**:
+- **Numeric features (9 dims)**: Price, volume, risk, score, trend, momentum, sentiment
+- **Text embeddings (384 dims)**: Company, sector, industry, news (via all-MiniLM-L6-v2)
+- **Padding (375 dims)**: Zeros to reach 768 total
+
+### Metadata Tracked
+```python
+{
+    'ticker': 'AAPL',
+    'company': 'Apple Inc.',
+    'date': '2025-11-25',
+    'current_price': 189.50,
+    'day_change_percent': 2.3,
+    'recommendation': 'Buy',
+    'risk_level': 'Low',
+    'score': 42,
+    'trajectory_trend': 'Uptrend',
+    'news_sentiment': 'Positive',
+    'search_mode': 'extended_watchlist',
+    'price_range': '$1-$10'
+}
+```
+
+### Smart Features
+1. **Duplicate Detection** - Skips stocks already saved today
+2. **Change Filtering** - Only displays stocks with >1% price change OR recommendation change
+3. **Historical Comparison** - Compares today vs yesterday automatically
+4. **Cost**: $0/month on free tier (10 stocks/day = ~3,650/year << 2M limit)
+
+### Daily Workflow
+**Day 1:**
 ```bash
-python test_all_features.py --quick
+python3 run.py
+# Select: 1 (Search ALL stocks)
+# Select: 8 (Save to Pinecone)
 ```
 
-## File Structure
-
-```
-server/
-├── run.py                    # Interactive menu - START HERE
-├── feature_manager.py        # Command-line interface
-├── test_all_features.py      # Test suite
-├── config.yaml               # Configuration file
-├── config_manager.py         # Config loader
-├── email_notifier.py         # Email functionality
-├── main.py                   # MCP server (advanced)
-├── start.sh                  # Quick start script
-└── features/
-    ├── stock_analyzer.py     # Analysis + news + recommendations
-    ├── news_analyzer.py      # News sentiment & trajectory
-    ├── historical_analyzer.py # 3-month performance
-    └── auto_scheduler.py     # Automated scheduling
-```
-
-## Key Capabilities
-
-### 1. Stock Analysis with News
-- Current price and change
-- Buy/sell recommendations (Strong Buy, Buy, Hold, Wait)
-- Entry points (conservative, moderate, aggressive)
-- Stop loss calculations
-- Risk assessment (Low/Medium/High)
-- **News sentiment** (positive/negative/neutral)
-- **Price trajectory** (7-day and 30-day targets)
-
-### 2. Top Recommendations (60-Point Scoring)
-Stocks scored based on:
-- Recommendation quality (10 pts)
-- Risk level (10 pts)
-- Day momentum (5 pts)
-- Volume ratio (5 pts)
-- **News sentiment** (10 pts)
-- **Trajectory prediction** (10 pts)
-- **RSI indicator** (10 pts) - NEW with Alpha Vantage
-
-### 3. Configuration (config.yaml)
-
-**Stock Lists:**
-- `default` - General mix
-- `tech` - Technology (AAPL, MSFT, NVDA, etc.)
-- `penny` - Low-price stocks ($1-$10)
-- `finance` - Banks and finance (BAC, WFC, JPM, etc.)
-- `ev_clean` - EV and clean energy
-- `custom` - Your watchlist
-
-**Settings:**
-- Email credentials (Gmail App Password required)
-- Price filters (min/max)
-- News analysis (enable/disable, sentiment weight)
-- Scheduler (daily/weekly times)
-
-## Examples
-
-### Find Best Penny Stocks
+**Day 2:**
 ```bash
-python feature_manager.py analyze --list penny --top 10
+python3 run.py
+# Select: 1 (Search ALL stocks)
+# Automatically shows: 📊 Yesterday's data, 🔄 Changes, price movements
+# Select: 8 (Save new recommendations only - duplicates auto-skipped)
 ```
 
-### Email Daily Tech Report
+## 📊 Recommendation Scoring (50 Points)
+
+| Factor | Points | Description |
+|--------|--------|-------------|
+| **Recommendation** | 10 | Strong Buy (10), Buy (7), Hold (5), Wait (2) |
+| **Risk Level** | 10 | Low (10), Medium (6), High (3) |
+| **Day Momentum** | 5 | Daily % change |
+| **Volume Ratio** | 5 | Current vs average volume |
+| **News Sentiment** | 10 | Positive (10), Neutral (5), Negative (0) |
+| **Trajectory** | 10 | Uptrend (10), Sideways (5), Downtrend (0) |
+
+**Example Output:**
+```
+📈 Top 10 Stock Recommendations (Score: 0-50)
+
+1. AAPL - Apple Inc. - $189.50 (+2.3%)
+   Score: 42/50 | Recommendation: Buy | Risk: Low
+   📊 Yesterday: $185.20 | 🔄 CHANGED (Hold → Buy)
+   Entry: $187.50 | Stop Loss: $180.00
+   News: Positive (8.5/10) | Trajectory: Uptrend
+```
+
+## 🔌 FastMCP Server (11 Tools)
+
+### Core Analysis Tools
+1. **get_stock_info** - Real-time data from Yahoo Finance
+2. **get_buying_recommendation** - Entry points, stop loss, risk analysis
+3. **get_top_performers** - Best gainers from watchlist
+4. **get_price_trajectory** - 30-day trend prediction
+5. **get_stocks_under_price** - Filter by price range ($1-$10)
+
+### Advanced Tools
+6. **get_top_stock_recommendations_in_range** - Top N with full analysis
+7. **generate_daily_analysis_email** - HTML email content
+8. **send_email_notification** - SMTP email delivery
+9. **save_daily_analysis_to_file** - Export HTML report
+
+### Custom Search
+10. **Extended watchlist search** - 60+ stocks from tech, finance, EV sectors
+11. **Configurable watchlist search** - Your custom config.yaml lists
+
+### Running MCP Server
 ```bash
-python feature_manager.py schedule \
-  --schedule-type daily \
-  --schedule-time 08:00 \
-  --list tech
+cd server
+python3 main.py
 ```
 
-### Top Gainers (Last 3 Months)
+Connect with MCP-compatible clients (Claude Desktop, etc.)
+
+## 📁 Project Structure
+
+```
+StockMCP/
+├── README.md                    # This file
+├── .gitignore                   # Python 3.13 optimized
+├── server/
+│   ├── main.py                  # FastMCP server (11 tools)
+│   ├── run.py                   # Interactive menu ⭐ START HERE
+│   ├── config_manager.py        # Configuration loader
+│   ├── config.yaml              # User settings
+│   ├── pyproject.toml           # Python 3.13+ dependencies
+│   ├── start.sh                 # Quick start script
+│   └── features/
+│       ├── feature_manager.py   # CLI commands
+│       ├── pinecone_saver.py    # Vector database integration
+│       ├── email_notifier.py    # Email functionality
+│       ├── stock_analyzer.py    # Core analysis + news
+│       ├── news_analyzer.py     # Sentiment analysis
+│       ├── historical_analyzer.py # 3-month tracking
+│       └── auto_scheduler.py    # Automated scheduling
+```
+
+## 🎓 Examples
+
+### Example 1: Daily Stock Tracking
 ```bash
-python feature_manager.py historical \
-  --list default \
-  --min-performance 20 \
-  --save top_gainers
+# Morning routine (Day 1)
+python3 run.py
+# 1 → Search ALL stocks → Top 10 displayed
+# 8 → Save to Pinecone
+
+# Morning routine (Day 2)
+python3 run.py
+# 1 → Search ALL stocks → Shows changes from yesterday!
+# Output: "🔄 CHANGED: Hold → Buy (+3.2%)"
+# 8 → Save only NEW recommendations (duplicates skipped)
 ```
 
-### Analyze Specific Stocks
+### Example 2: Find Best Penny Stocks
 ```bash
-python feature_manager.py analyze \
-  --tickers AAPL,MSFT,TSLA \
-  --min-price 0 \
-  --max-price 500
+python3 features/feature_manager.py search-all --top 10 --min-price 1.0 --max-price 5.0
 ```
 
-## Gmail Setup (For Email Features)
+### Example 3: Email Daily Report
+```bash
+# Configure email in config.yaml first
+python3 features/feature_manager.py email --list tech
 
+# Or schedule daily at 8 AM
+python3 features/feature_manager.py schedule --schedule-type daily --schedule-time 08:00 --list penny
+```
+
+### Example 4: Historical Analysis
+```bash
+# Find stocks with 20%+ gains in last 3 months
+python3 features/feature_manager.py historical --min-performance 20 --list default
+```
+
+
+## ⚙️ Configuration
+
+### Stock Lists (config.yaml)
+- **default** - Mixed portfolio (7 stocks)
+- **tech** - AAPL, MSFT, NVDA, GOOGL, META, AMD, etc.
+- **penny** - Low-price, high-volume stocks
+- **finance** - Banks: JPM, BAC, WFC, C, etc.
+- **ev_clean** - TSLA, RIVN, LCID, NIO, etc.
+- **custom** - Your watchlist
+
+### Extended Watchlist (60+ Stocks)
+Auto-included in "Search ALL" mode:
+- Major tech (AAPL, MSFT, GOOGL, AMZN, etc.)
+- Affordable stocks (F, NOK, BB, AMC, SNDL, etc.)
+- EV sector (TSLA, NIO, RIVN, LCID, etc.)
+- Cannabis (ACB, CGC, TLRY, SNDL, etc.)
+- Meme stocks (AMC, GME, BB, EXPR, etc.)
+
+### Price Filters
+```yaml
+price_filters:
+  min_price: 1.0   # $1 minimum
+  max_price: 10.0  # $10 maximum
+```
+
+### Email Setup (Gmail)
 1. Enable 2-Step Verification: https://myaccount.google.com/security
 2. Generate App Password: https://myaccount.google.com/apppasswords
 3. Add to `config.yaml`:
 ```yaml
 email:
+  enabled: true
   from: "your-email@gmail.com"
-  password: "16-char-app-password"
+  password: "16-char-app-password"  # NOT your Gmail password!
   to: "recipient@example.com"
 ```
 
-## Testing
+## 🐛 Troubleshooting
 
-**Quick Test:**
-```bash
-python test_all_features.py --quick
-```
+### No Stocks Found
+- Adjust price range: `--min-price 0 --max-price 100`
+- Try different watchlist: `--list tech`
 
-**Full Test Suite:**
-```bash
-python test_all_features.py
-```
+### Pinecone Errors
+- Check API key in `pinecone_saver.py` (line 14)
+- Verify index exists: https://app.pinecone.io
+- Free tier limits: 2M vectors
 
-Tests cover:
-- Single/multiple stock analysis
-- Top recommendations with scoring
-- Historical performance
-- Configuration manager
-- News analyzer
-- Email functionality
+### Text Model Download
+- First run downloads ~80MB model (all-MiniLM-L6-v2)
+- Cached after first download
+- Disable with `use_text_embeddings=False` in code
 
-## MCP Server (Advanced)
+### Email Failures
+- Use Gmail App Password (not regular password)
+- Check 2-step verification enabled
+- Test with: `python3 feature_manager.py email --list default`
 
-For use with MCP-compatible AI assistants:
-```bash
-cd server
-uv run main.py
-```
+### Import Errors
+- Ensure virtual environment active: `source .venv/bin/activate`
+- Reinstall: `pip install -e .`
+- Check Python version: `python3 --version` (must be 3.13+)
 
-### Available MCP Tools
-
-#### Core Tools (Yahoo Finance)
-- `get_stock_info` - Real-time stock data
-- `get_buying_recommendation` - Buy/sell advice with technical analysis
-- `get_top_performers` - Best performing stocks from watchlist
-- `get_price_trajectory` - Price trend predictions
-- `get_stocks_under_price` - Filter by price range
-- `generate_daily_analysis_email` - Create email reports
-- `send_email_notification` - Send emails via SMTP
-- `save_daily_analysis_to_file` - Save reports as HTML
-
-#### Multi-Source Tools (Yahoo Finance + Alpha Vantage)
-- `get_multi_source_stock_data` - Compare data from both sources
-- `get_comprehensive_recommendation` - Enhanced recommendations with RSI
-- `compare_stock_sources` - Detailed side-by-side comparison
-
-### Multi-Source Data Features
-
-**Data Validation:**
-- Cross-verify prices between Yahoo Finance and Alpha Vantage
-- Detect discrepancies and data inconsistencies
-- Get data consistency ratings (High/Medium/Low)
-
-**RSI Technical Indicator:**
-- 14-day Relative Strength Index from Alpha Vantage
-- Automatic signals: Oversold (<30), Overbought (>70), Neutral (30-70)
-- Helps identify optimal entry/exit points
-
-**Consensus Recommendations:**
-- Combines Yahoo Finance technical analysis with Alpha Vantage RSI
-- Multi-signal confirmation for higher confidence
-- Ratings: Strong Buy, Buy, Hold, Wait
-
-**Example Usage:**
-```python
-# Compare data sources
-result = await get_multi_source_stock_data("AAPL")
-print(f"Price difference: {result['comparison']['price_difference_percent']}%")
-print(f"Data consistency: {result['comparison']['data_consistency']}")
-print(f"RSI: {result['alpha_vantage']['rsi']} ({result['alpha_vantage']['rsi_signal']})")
-
-# Get enhanced recommendation
-rec = await get_comprehensive_recommendation("TSLA", use_alpha_vantage=True)
-print(f"Consensus: {rec['consensus_recommendation']['overall']}")
-print(f"Confidence: {rec['consensus_recommendation']['confidence']}")
-
-# Validate data quality
-comp = await compare_stock_sources("NVDA")
-print(f"Reliability: {comp['summary']['overall_reliability']}")
-```
-
-### Alpha Vantage API Setup
-
-**Free Tier Limits:**
-- 5 API calls per minute
-- 500 API calls per day
-
-**Getting Started:**
-1. Sign up at https://www.alphavantage.co/support/#api-key
-2. Get your free API key
-3. Set environment variable: `export ALPHA_VANTAGE_API_KEY="your_key"`
-4. System falls back to Yahoo Finance if Alpha Vantage unavailable
-
-**Managing Rate Limits:**
-- Use `use_alpha_vantage=False` parameter when AV data isn't needed
-- Cache results for repeated queries
-- Consider premium tier for production ($49.99/month = 600 calls/min)
-
-## Command Reference
+## 📚 Command Reference
 
 | Command | Description |
 |---------|-------------|
-| `python run.py` | Interactive menu |
-| `python feature_manager.py analyze --list penny` | Analyze penny stocks |
-| `python feature_manager.py analyze --list tech --top 20` | Top 20 tech stocks |
-| `python feature_manager.py historical --min-performance 15` | 15%+ 3-month gains |
-| `python feature_manager.py email --list default` | Send email report |
-| `python feature_manager.py schedule --schedule-type daily --schedule-time 09:00` | Daily 9 AM reports |
-| `python test_all_features.py --quick` | Quick test |
-| `./start.sh` | Quick start script |
+| `python3 run.py` | Interactive menu (recommended) |
+| `python3 features/feature_manager.py search-all --top 10` | Search 60+ stocks |
+| `python3 features/feature_manager.py analyze --list penny` | Analyze configured list |
+| `python3 features/feature_manager.py save-pinecone --mode all` | Save to Pinecone |
+| `python3 features/feature_manager.py historical --min-performance 15` | 15%+ gainers |
+| `python3 features/feature_manager.py email --list tech` | Send email report |
+| `python3 features/feature_manager.py schedule --schedule-type daily --schedule-time 09:00` | Daily automation |
+| `python3 main.py` | Start MCP server |
 
-## Options
+### Common Flags
+- `--tickers AAPL,MSFT,TSLA` - Specific stocks
+- `--list penny` - Use watchlist
+- `--top 20` - Top N recommendations
+- `--min-price 1.0` - Minimum price
+- `--max-price 10.0` - Maximum price
+- `--no-news` - Disable news (faster)
+- `--save filename` - Export results
 
-**Common Flags:**
-- `--tickers AAPL,MSFT` - Specific stocks
-- `--list penny` - Use config watchlist
-- `--top 20` - Get top N recommendations
-- `--min-price 1.0` - Minimum price filter
-- `--max-price 10.0` - Maximum price filter
-- `--min-performance 10` - Min 3-month % gain
-- `--no-news` - Disable news analysis (faster)
-- `--save filename` - Save to file
+## 🔐 Privacy & Security
 
-## Requirements
+- **API Keys**: Pinecone API key hardcoded in `features/pinecone_saver.py` (line 14) - change for production
+- **Email**: Uses Gmail App Passwords (not stored in repo)
+- **Data**: All stock data from public APIs (Yahoo Finance)
+- **Storage**: Pinecone vectors stored in AWS us-east-1
+- **No PII**: System doesn't collect personal information
 
-- Python 3.12+
-- yfinance - Stock data from Yahoo Finance
-- requests - Alpha Vantage API calls
-- pandas, numpy - Data processing
-- pyyaml - Configuration
-- schedule - Task scheduling
-- mcp - Model Context Protocol
+## 📈 Performance
 
-## What's New
+- **Analysis Speed**: ~2-5 seconds per stock (with news)
+- **Batch Analysis**: 60+ stocks in ~2 minutes
+- **Pinecone Save**: ~1 second per 10 stocks
+- **Email Send**: ~2-3 seconds
+- **Memory Usage**: ~200-500MB (with text model loaded)
 
-### Multi-Source Data Integration (Latest)
-- **Dual Data Sources**: Yahoo Finance + Alpha Vantage for cross-validation
-- **RSI Indicator**: 14-day Relative Strength Index for overbought/oversold signals
-- **Consensus Recommendations**: Combined analysis from multiple sources
-- **Data Validation**: Automatic discrepancy detection and consistency ratings
-- **Enhanced Scoring**: 60-point system (up from 50) with RSI factor
-- **CLI Integration**: All features (analyze, top N, historical) now use Alpha Vantage
-- **3 New MCP Tools**: Multi-source comparison, comprehensive recommendations, source validation
+## 🤝 Contributing
 
-### Benefits:
-- **Higher Accuracy**: Cross-verify data to catch errors
-- **Better Insights**: Access RSI and Alpha Vantage-exclusive metrics
-- **Increased Confidence**: Recommendations backed by multiple sources
-- **Reliability**: System works even if one source fails
-- **Flexibility**: Choose single or multi-source analysis
-- **CLI & MCP Support**: Both interfaces benefit from multi-source data
+This is a personal project. For suggestions:
+1. Fork the repository
+2. Create feature branch
+3. Submit pull request
 
-## Troubleshooting
+## ⚠️ Disclaimer
 
-**No stocks found:**
-- Check price range (default $1-$10)
-- Use `--min-price 0 --max-price 1000` for broader range
+**NOT FINANCIAL ADVICE**
 
-**News not working:**
-- Some stocks have limited news
-- Use `--no-news` flag for faster analysis
+This tool is for educational and informational purposes only. It does not constitute financial advice, investment recommendations, or solicitations to buy/sell securities.
 
-**Email fails:**
-- Verify Gmail App Password (not regular password)
-- Check config.yaml formatting
-- Ensure 2-step verification enabled
+**Key Points:**
+- Stock market involves risk of loss
+- Past performance ≠ future results
+- Always do your own research
+- Consult licensed financial advisors
+- Use at your own risk
 
-**Alpha Vantage issues:**
-- Rate limit exceeded: Wait 60 seconds (5 calls/min limit)
-- "Demo key" limitations: Get your free API key
-- Price discrepancies: Check `latest_trading_day` field for data freshness
+**Data Sources:**
+- Yahoo Finance (15-20 min delay)
+- News sentiment from public sources
+- Technical indicators calculated from historical data
 
-## Disclaimer
+**No Guarantees:**
+- Recommendations may be wrong
+- Prices may differ from real-time
+- System errors possible
+- News sentiment subjective
 
-This tool is for informational purposes only. Not financial advice. Always do your own research and consult with qualified financial advisors before making investment decisions.
+## 📄 License
 
-**Data sources:** 
-- Yahoo Finance (15-20 minute delay during market hours)
-- Alpha Vantage API (real-time and technical indicators)
-- News feeds from yfinance
+MIT License - Use at your own risk
 
-**Important Notes:**
-- Price discrepancies between sources may occur due to timing
-- RSI and technical indicators are tools, not guarantees
-- Multi-source validation increases confidence but doesn't eliminate risk
-- Free API tiers have rate limits - plan usage accordingly
+## 🔄 Version History
+
+**v1.0.0** (2025-11-25)
+- Python 3.13 optimization
+- Pinecone vector database integration
+- Hybrid embeddings (numeric + text)
+- Duplicate detection & change filtering
+- Extended watchlist (60+ stocks)
+- Removed Alpha Vantage (unused)
+- FastMCP server with 11 tools
+- Cleaned up codebase
+
+---
+
+**Ready to start?**
+```bash
+cd server
+python3 run.py
+```
+
+Select Option 1 to search stocks, Option 8 to save to Pinecone, and start tracking your recommendations! 🚀

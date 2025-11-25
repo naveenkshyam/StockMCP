@@ -20,6 +20,7 @@ from features.stock_analyzer import (
 from features.historical_analyzer import analyze_3month_performance, get_3month_recommendations
 from features.auto_scheduler import StockScheduler, send_immediate_report
 from config_manager import get_config
+from features.pinecone_saver import PineconeStockSaver, save_to_pinecone
 
 
 # Default watchlist (can be customized)
@@ -30,6 +31,21 @@ DEFAULT_WATCHLIST = [
     "BBBY", "BBY", "TGT", "WMT", "COST", "HD", "LOW", "DIS", "NFLX", "PARA",
     "ABTS", "GSAT", "TLRY", "CGC", "SNDL", "ACB", "CRON", "OGI", "KERN", "HIMS",
     "HYZN", "EVGO", "BLNK", "CHPT", "GOEV", "WKHS", "XL", "ARVL", "ENVX", "QS"
+]
+
+# Extended watchlist for comprehensive search (60+ stocks)
+EXTENDED_WATCHLIST = [
+    'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA', 'META', 'AMD', 
+    'NFLX', 'DIS', 'PYPL', 'INTC', 'CSCO', 'ADBE', 'CRM', 'ORCL',
+    'BABA', 'V', 'MA', 'JPM', 'BAC', 'WMT', 'PFE', 'KO', 'PEP',
+    'NKE', 'MCD', 'SBUX', 'COST', 'HD', 
+    'F', 'AAL', 'CCL', 'PLUG', 'SOFI', 'NIO', 'LCID', 'RIVN', 
+    'UBER', 'LYFT', 'SNAP', 'PINS', 'ZM', 'DKNG', 'PLTR', 'BB', 
+    'NOK', 'AMC', 'GME', 'WKHS', 'SIRI', 'VALE', 'GOLD', 'ABEV',
+    'GNUS', 'IDEX', 'BNGO', 'SNDL', 'CLVS', 'INO', 'NKLA',
+    'TOPS', 'SHIP', 'CLOV', 'WISH', 'RIDE', 'MULN',
+    'EXPR', 'KOSS', 'SENS', 'OCGN', 'GEVO', 'FCEL', 'MARA', 'RIOT',
+    'ACB', 'CGC', 'TLRY', 'HEXO', 'OGI', 'CRON'
 ]
 
 
@@ -131,6 +147,225 @@ async def feature_analyze_stocks(args):
                 for stock in stocks:
                     f.write(f"{stock['ticker']}: ${stock['current_price']:.2f} - {stock['recommendation']}\n")
             print(f"Results saved to {filename}")
+
+
+async def feature_search_all_stocks(args):
+    """Feature: Search ALL 60+ stocks in extended watchlist"""
+    print(f"\n{'='*60}")
+    print("Feature: Search ALL Stocks ($1-$10) - Top Recommendations")
+    print(f"{'='*60}\n")
+    
+    min_price = args.min_price if args.min_price else 1.0
+    max_price = args.max_price if args.max_price else 10.0
+    top_n = args.top if args.top else 10
+    
+    print(f"Searching {len(EXTENDED_WATCHLIST)} stocks in extended watchlist...")
+    print(f"Price range: ${min_price} - ${max_price}")
+    print(f"Top recommendations: {top_n}\n")
+    
+    # Get top recommendations from extended watchlist
+    top_stocks = await get_top_recommendations(
+        tickers=EXTENDED_WATCHLIST,
+        min_price=min_price,
+        max_price=max_price,
+        top_n=top_n,
+        include_news=not args.no_news
+    )
+    
+    if not top_stocks:
+        print("No stocks found matching criteria.")
+        return
+    
+    # Get yesterday's data from Pinecone for comparison
+    from datetime import datetime, timedelta
+    yesterday_date = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+    
+    print("Checking Pinecone for yesterday's recommendations...")
+    saver = PineconeStockSaver()
+    saver.initialize_index()
+    
+    yesterday_recs = saver.get_recommendations_by_date(yesterday_date)
+    yesterday_map = {rec['ticker']: rec for rec in yesterday_recs} if yesterday_recs else {}
+    
+    if yesterday_map:
+        print(f"✓ Found {len(yesterday_map)} recommendations from {yesterday_date}\n")
+    else:
+        print(f"ℹ No data from yesterday ({yesterday_date}) - this is your first run\n")
+    
+    print(f"Top {len(top_stocks)} Recommendations from Extended Watchlist:\n")
+    
+    changes_detected = 0
+    no_change_count = 0
+    
+    for i, item in enumerate(top_stocks, 1):
+        stock = item['stock_data']
+        score = item['score']
+        ticker = stock['ticker']
+        
+        # Compare with yesterday's data first
+        has_change = False
+        if ticker in yesterday_map:
+            yesterday_rec = yesterday_map[ticker]
+            yesterday_price = yesterday_rec.get('current_price', 0)
+            yesterday_recommendation = yesterday_rec.get('recommendation', 'Unknown')
+            
+            price_change = stock['current_price'] - yesterday_price
+            price_change_pct = (price_change / yesterday_price * 100) if yesterday_price > 0 else 0
+            
+            # Check if there are any significant changes
+            rec_changed = stock['recommendation'] != yesterday_recommendation
+            price_changed = abs(price_change_pct) > 1.0  # More than 1% change
+            
+            if rec_changed or price_changed:
+                has_change = True
+                changes_detected += 1
+            else:
+                no_change_count += 1
+                continue  # Skip stocks with no significant changes
+        
+        # Only display stocks with changes or new stocks
+        print(f"{changes_detected}. {ticker} - {stock.get('company', 'N/A')}")
+        print(f"   Price: ${stock['current_price']:.2f} ({stock.get('day_change_percent', 0):+.2f}%)")
+        print(f"   Score: {score}/50")
+        print(f"   Recommendation: {stock['recommendation']}")
+        print(f"   Risk Level: {stock['risk_level']}")
+        
+        # Show comparison with yesterday's data
+        if ticker in yesterday_map:
+            yesterday_rec = yesterday_map[ticker]
+            yesterday_price = yesterday_rec.get('current_price', 0)
+            yesterday_recommendation = yesterday_rec.get('recommendation', 'Unknown')
+            
+            price_change = stock['current_price'] - yesterday_price
+            price_change_pct = (price_change / yesterday_price * 100) if yesterday_price > 0 else 0
+            
+            print(f"   📊 Yesterday: {yesterday_recommendation} @ ${yesterday_price:.2f}")
+            
+            if stock['recommendation'] != yesterday_recommendation:
+                print(f"   🔄 CHANGED: {yesterday_recommendation} → {stock['recommendation']}")
+            
+            if abs(price_change_pct) > 5:
+                direction = "↗" if price_change > 0 else "↘"
+                print(f"   {direction} Price Change: {price_change_pct:+.2f}% since yesterday")
+            elif abs(price_change_pct) > 1:
+                direction = "↗" if price_change > 0 else "↘"
+                print(f"   {direction} Price Change: {price_change_pct:+.2f}% since yesterday")
+        
+        if 'news' in stock and stock['news'].get('news_available'):
+            print(f"   News Sentiment: {stock['news']['overall_sentiment']} ({stock['news']['sentiment_score']:.2f})")
+        
+        if 'trajectory' in stock:
+            print(f"   Trajectory: {stock['trajectory']['trajectory']} - {stock['trajectory']['action']}")
+        
+        print()
+    
+    # Summary
+    if no_change_count > 0:
+        print(f"ℹ Filtered out {no_change_count} stocks with no significant changes (< 1% price change and same recommendation)")
+    
+    print(f"\n✓ Showing {changes_detected} stocks with changes")
+    
+    # Save if requested
+    if args.save:
+        report = format_top_recommendations_report(top_stocks, min_price, max_price)
+        filename = f"all_stocks_top_{top_n}_{args.save}.txt"
+        with open(filename, 'w') as f:
+            f.write(report)
+        print(f"Report saved to {filename}")
+    
+    return top_stocks  # Return for potential use by save-pinecone
+
+
+async def feature_save_to_pinecone(args):
+    """Feature: Save recommendations to Pinecone vector database"""
+    print(f"\n{'='*60}")
+    print("Feature: Save Recommendations to Pinecone")
+    print(f"{'='*60}\n")
+    
+    config = get_config()
+    
+    # Determine search mode
+    if args.mode == 'all':
+        print("Mode: ALL stocks search (extended watchlist)")
+        min_price = args.min_price if args.min_price else 1.0
+        max_price = args.max_price if args.max_price else 10.0
+        top_n = args.top if args.top else 10
+        
+        print(f"Searching {len(EXTENDED_WATCHLIST)} stocks...")
+        print(f"Price range: ${min_price} - ${max_price}")
+        print(f"Top N: {top_n}\n")
+        
+        top_stocks = await get_top_recommendations(
+            tickers=EXTENDED_WATCHLIST,
+            min_price=min_price,
+            max_price=max_price,
+            top_n=top_n,
+            include_news=True
+        )
+        
+        metadata = {
+            'mode': 'extended_watchlist',
+            'min_price': min_price,
+            'max_price': max_price,
+            'total_searched': len(EXTENDED_WATCHLIST)
+        }
+        
+    elif args.mode == 'config':
+        print("Mode: Configured stocks search (config.yaml)")
+        list_name = args.list if args.list else 'default'
+        tickers = config.get_stock_list(list_name)
+        min_price = args.min_price if args.min_price else config.get_min_price()
+        max_price = args.max_price if args.max_price else config.get_max_price()
+        top_n = args.top if args.top else 20
+        
+        print(f"Using watchlist '{list_name}' from config")
+        print(f"Analyzing {len(tickers)} stocks...")
+        print(f"Top N: {top_n}\n")
+        
+        top_stocks = await get_top_recommendations(
+            tickers=tickers,
+            min_price=min_price,
+            max_price=max_price,
+            top_n=top_n,
+            include_news=True
+        )
+        
+        metadata = {
+            'mode': 'config',
+            'list_name': list_name,
+            'min_price': min_price,
+            'max_price': max_price,
+            'total_searched': len(tickers)
+        }
+    else:
+        print(f"✗ Invalid mode: {args.mode}")
+        print("Valid modes: 'all' or 'config'")
+        return
+    
+    if not top_stocks:
+        print("✗ No stocks found matching criteria. Nothing to save.")
+        return
+    
+    print(f"\nFound {len(top_stocks)} recommendations to save\n")
+    
+    # Extract stock data from top_stocks
+    recommendations = [item['stock_data'] for item in top_stocks]
+    
+    # Save to Pinecone
+    print("Saving to Pinecone vector database...")
+    success = save_to_pinecone(recommendations, metadata)
+    
+    if success:
+        print("\n" + "="*60)
+        print("✓ SUCCESS: Recommendations saved to Pinecone!")
+        print("="*60)
+        print("\nYou can now:")
+        print("  • Run this again tomorrow to track changes")
+        print("  • Compare today's vs tomorrow's recommendations")
+        print("  • Analyze how recommendations evolved over time")
+        print()
+    else:
+        print("\n✗ Failed to save recommendations to Pinecone")
 
 
 async def feature_historical_analysis(args):
@@ -247,8 +482,17 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Analyze stocks with recommendations
-  python feature_manager.py analyze --tickers AAPL,MSFT,TSLA
+  # Search ALL 60+ stocks for top 10 recommendations
+  python feature_manager.py search-all --top 10 --min-price 1.0 --max-price 10.0
+  
+  # Analyze configured stocks with recommendations
+  python feature_manager.py analyze --list default --top 20
+  
+  # Save recommendations to Pinecone (all stocks mode)
+  python feature_manager.py save-pinecone --mode all --top 10
+  
+  # Save recommendations to Pinecone (config mode)
+  python feature_manager.py save-pinecone --mode config --list default --top 20
   
   # 3-month historical analysis
   python feature_manager.py historical --min-performance 10
@@ -263,8 +507,16 @@ Examples:
     
     subparsers = parser.add_subparsers(dest='feature', help='Feature to run')
     
-    # Analyze feature
-    analyze_parser = subparsers.add_parser('analyze', help='Analyze stocks with recommendations')
+    # Search ALL stocks feature (NEW)
+    search_all_parser = subparsers.add_parser('search-all', help='Search ALL 60+ stocks for top recommendations')
+    search_all_parser.add_argument('--top', type=int, default=10, help='Number of top recommendations (default: 10)')
+    search_all_parser.add_argument('--min-price', type=float, default=1.0, help='Minimum price (default: 1.0)')
+    search_all_parser.add_argument('--max-price', type=float, default=10.0, help='Maximum price (default: 10.0)')
+    search_all_parser.add_argument('--no-news', action='store_true', help='Disable news analysis')
+    search_all_parser.add_argument('--save', type=str, help='Save results to file (provide filename suffix)')
+    
+    # Analyze feature (configured stocks)
+    analyze_parser = subparsers.add_parser('analyze', help='Analyze configured stocks with recommendations')
     analyze_parser.add_argument('--tickers', type=str, help='Comma-separated ticker symbols')
     analyze_parser.add_argument('--list', type=str, help='Use stock list from config (e.g., tech, penny, finance, ev_clean, custom)')
     analyze_parser.add_argument('--min-price', type=float, help='Minimum price (uses config default if not specified)')
@@ -272,6 +524,15 @@ Examples:
     analyze_parser.add_argument('--top', type=int, help='Get top N recommendations with scoring (e.g., --top 20)')
     analyze_parser.add_argument('--no-news', action='store_true', help='Disable news analysis')
     analyze_parser.add_argument('--save', type=str, help='Save results to file (provide filename suffix)')
+    
+    # Save to Pinecone feature (NEW)
+    pinecone_parser = subparsers.add_parser('save-pinecone', help='Save recommendations to Pinecone vector database')
+    pinecone_parser.add_argument('--mode', type=str, required=True, choices=['all', 'config'], 
+                                 help='Search mode: "all" for 60+ stocks, "config" for configured stocks')
+    pinecone_parser.add_argument('--list', type=str, help='Stock list name (for config mode)')
+    pinecone_parser.add_argument('--top', type=int, help='Number of top recommendations to save')
+    pinecone_parser.add_argument('--min-price', type=float, help='Minimum price')
+    pinecone_parser.add_argument('--max-price', type=float, help='Maximum price')
     
     # Historical analysis feature
     historical_parser = subparsers.add_parser('historical', help='3-month historical analysis')
@@ -309,8 +570,12 @@ Examples:
         return
     
     # Run selected feature
-    if args.feature == 'analyze':
+    if args.feature == 'search-all':
+        asyncio.run(feature_search_all_stocks(args))
+    elif args.feature == 'analyze':
         asyncio.run(feature_analyze_stocks(args))
+    elif args.feature == 'save-pinecone':
+        asyncio.run(feature_save_to_pinecone(args))
     elif args.feature == 'historical':
         asyncio.run(feature_historical_analysis(args))
     elif args.feature == 'email':

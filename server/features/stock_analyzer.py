@@ -1,27 +1,22 @@
 """
 Feature: Stock Analysis with Recommendations
 Provides detailed analysis and buying recommendations for stocks
-Enhanced with news sentiment analysis and Alpha Vantage multi-source validation
+Enhanced with news sentiment analysis
 """
 import yfinance as yf
 import numpy as np
 from datetime import datetime
 from features.news_analyzer import NewsAnalyzer
-from alpha_vantage_client import (
-    fetch_alpha_vantage_quote,
-    fetch_alpha_vantage_technical
-)
 
 
-async def analyze_stock_with_recommendation(ticker: str, include_news: bool = True, max_news: int = 5, use_alpha_vantage: bool = True) -> dict:
+async def analyze_stock_with_recommendation(ticker: str, include_news: bool = True, max_news: int = 5) -> dict:
     """
-    Analyze a stock and provide detailed buying recommendation with multi-source validation
+    Analyze a stock and provide detailed buying recommendation
     
     Args:
         ticker: Stock ticker symbol
         include_news: Whether to include news sentiment analysis
         max_news: Maximum number of news articles to analyze
-        use_alpha_vantage: Whether to include Alpha Vantage data for validation
         
     Returns:
         dict: Complete analysis with recommendation
@@ -97,59 +92,9 @@ async def analyze_stock_with_recommendation(ticker: str, include_news: bool = Tr
             analysis_points.append(f"Price below 50-day MA (${ma_50:.2f}) - bearish trend")
         
         # Alpha Vantage integration for multi-source validation
-        av_data = None
-        rsi_data = None
-        consensus_recommendation = recommendation
-        
-        if use_alpha_vantage:
-            try:
-                av_quote = fetch_alpha_vantage_quote(ticker)
-                rsi_data = fetch_alpha_vantage_technical(ticker)
-                
-                if 'error' not in av_quote:
-                    av_price = av_quote.get('price')
-                    if av_price:
-                        price_diff_pct = abs(current_price - av_price) / current_price * 100
-                        
-                        av_data = {
-                            'price': av_price,
-                            'price_difference': round(price_diff_pct, 2),
-                            'consistency': 'High' if price_diff_pct < 0.5 else 'Medium' if price_diff_pct < 2 else 'Low'
-                        }
-                        
-                        if price_diff_pct < 2:
-                            analysis_points.append(f"✓ Price validated across sources (diff: {price_diff_pct:.2f}%)")
-                        else:
-                            analysis_points.append(f"⚠ Price discrepancy: {price_diff_pct:.2f}% between sources")
-                
-                # RSI-based recommendation adjustment
-                if 'error' not in rsi_data and rsi_data.get('rsi'):
-                    rsi = rsi_data['rsi']
-                    rsi_signal = rsi_data['rsi_signal']
-                    
-                    analysis_points.append(f"RSI: {rsi:.1f} - {rsi_signal}")
-                    
-                    # Adjust recommendation based on RSI
-                    if 'Buy' in recommendation and rsi_signal == 'Oversold':
-                        consensus_recommendation = 'Strong Buy'
-                        analysis_points.append("✓ RSI confirms oversold - strong buy signal")
-                    elif recommendation == 'Hold' and rsi_signal == 'Oversold':
-                        consensus_recommendation = 'Buy'
-                        analysis_points.append("✓ RSI oversold - buy opportunity")
-                    elif 'Buy' in recommendation and rsi_signal == 'Overbought':
-                        consensus_recommendation = 'Wait for Pullback'
-                        analysis_points.append("⚠ RSI overbought - wait for pullback")
-                    elif recommendation == 'Hold' and rsi_signal == 'Overbought':
-                        consensus_recommendation = 'Wait'
-                        analysis_points.append("⚠ RSI overbought - consider waiting")
-                        
-            except Exception as e:
-                # Alpha Vantage failed, continue with Yahoo Finance only
-                pass
-        
         # News analysis integration
         news_data = None
-        final_recommendation = consensus_recommendation
+        final_recommendation = recommendation
         trajectory_data = None
         
         if include_news:
@@ -208,15 +153,6 @@ async def analyze_stock_with_recommendation(ticker: str, include_news: bool = Tr
             "market_cap": info.get('marketCap', 0)
         }
         
-        # Add Alpha Vantage data if available
-        if av_data:
-            result['alpha_vantage'] = av_data
-        if rsi_data and rsi_data.get('rsi'):
-            result['rsi'] = {
-                'value': rsi_data['rsi'],
-                'signal': rsi_data['rsi_signal']
-            }
-        
         # Add news and trajectory data if available
         if news_data:
             result['news'] = news_data
@@ -233,8 +169,7 @@ async def analyze_multiple_stocks(
     tickers: list,
     min_price: float = 1.0,
     max_price: float = 10.0,
-    include_news: bool = True,
-    use_alpha_vantage: bool = True
+    include_news: bool = True
 ) -> list:
     """
     Analyze multiple stocks and return recommendations
@@ -244,7 +179,6 @@ async def analyze_multiple_stocks(
         min_price: Minimum price filter
         max_price: Maximum price filter
         include_news: Whether to include news analysis
-        use_alpha_vantage: Whether to use Alpha Vantage for validation
         
     Returns:
         list: List of analyzed stocks with recommendations
@@ -253,7 +187,7 @@ async def analyze_multiple_stocks(
     
     for ticker in tickers:
         try:
-            analysis = await analyze_stock_with_recommendation(ticker, include_news=include_news, use_alpha_vantage=use_alpha_vantage)
+            analysis = await analyze_stock_with_recommendation(ticker, include_news=include_news)
             
             if "error" not in analysis:
                 # Filter by price range
@@ -270,8 +204,7 @@ async def get_top_recommendations(
     min_price: float = 1.0,
     max_price: float = 10.0,
     top_n: int = 20,
-    include_news: bool = True,
-    use_alpha_vantage: bool = True
+    include_news: bool = True
 ) -> list:
     """
     Get top N stock recommendations based on enhanced scoring system
@@ -282,16 +215,14 @@ async def get_top_recommendations(
         max_price: Maximum price filter
         top_n: Number of top recommendations to return
         include_news: Whether to include news analysis
-        use_alpha_vantage: Whether to use Alpha Vantage for validation
         
     Returns:
         list: Top N stocks sorted by recommendation score
     """
     print(f"\n🔍 Analyzing {len(tickers)} stocks between ${min_price} and ${max_price}...")
-    print(f"   Multi-source validation: {'Enabled' if use_alpha_vantage else 'Disabled'}")
     
     # Analyze all stocks
-    analyzed_stocks = await analyze_multiple_stocks(tickers, min_price, max_price, include_news, use_alpha_vantage)
+    analyzed_stocks = await analyze_multiple_stocks(tickers, min_price, max_price, include_news)
     
     if not analyzed_stocks:
         return []
@@ -314,6 +245,7 @@ async def get_top_recommendations(
     print(f"✓ Top {len(top_stocks)} recommendations selected")
     
     return top_stocks
+
 
 
 def calculate_stock_score(stock_data: dict) -> int:

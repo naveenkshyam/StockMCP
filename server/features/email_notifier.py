@@ -476,7 +476,7 @@ if __name__ == "__main__":
     print("\nThis module provides email notification functionality for stock analysis.")
     print("\nExample Usage:")
     print("""
-from email_notifier import StockEmailNotifier, create_and_send_email
+from features.email_notifier import StockEmailNotifier, create_and_send_email
 
 # Sample stock data
 stocks = [
