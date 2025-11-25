@@ -12,7 +12,7 @@ import hashlib
 import numpy as np
 
 # Pinecone Configuration
-PINECONE_API_KEY = "pcsk_3pB4Vm_4b1hv5SDmCBN9CHoAHX4mDqw6igZqM5Mf6HRNWFuidC1i4YSt699R3jBH3ZBT71"
+PINECONE_API_KEY = "<REPLACE_WITH_YOUR_PINECONE_API_KEY>"  # Change for production
 PINECONE_INDEX_NAME = "stock-recommendations"
 PINECONE_DIMENSION = 768  # Dimension for embeddings
 
