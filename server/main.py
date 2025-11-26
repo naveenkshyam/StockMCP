@@ -5,6 +5,11 @@ from datetime import datetime, timedelta
 import numpy as np
 from typing import Optional
 from features.email_notifier import StockEmailNotifier
+from features.pinecone_historical import (
+    PineconeHistoricalAnalyzer,
+    analyze_pinecone_historical,
+    format_historical_report
+)
 
 # Initialize FastMCP server
 mcp = FastMCP("stock-api")
@@ -898,6 +903,164 @@ async def save_daily_analysis_to_file(
     
     except Exception as e:
         return {"error": str(e)}
+
+@mcp.tool()
+async def analyze_pinecone_historical_stock(
+    ticker: str = None,
+    date: str = None,
+    analyze_all: bool = False,
+    min_score: int = 50,
+    sort_by: str = "performance"
+) -> dict:
+    """
+    Analyze historical performance of stocks saved in Pinecone (3-month comparison).
+    Compares current stock data with 3 months ago, includes news sentiment, and provides recommendations.
+    
+    Args:
+        ticker (str): Single stock ticker to analyze (e.g., 'AAPL'). Leave empty if analyze_all=True
+        date (str): Date to analyze in YYYY-MM-DD format (defaults to today)
+        analyze_all (bool): If True, analyzes all stocks saved in Pinecone for the date (default: False)
+        min_score (int): Minimum recommendation score (0-100) to include when analyze_all=True (default: 50)
+        sort_by (str): Sort method when analyze_all=True: 'performance', 'score', or 'news' (default: 'performance')
+    
+    Returns:
+        dict: Historical analysis including:
+            - 3-month price comparison (current vs 3 months ago)
+            - Recommendation changes over time
+            - Technical analysis (trend, volatility, moving averages)
+            - News sentiment analysis
+            - Comprehensive buy/sell/hold recommendation with scoring
+            - Key factors and detailed reasoning
+    
+    Examples:
+        # Analyze single stock
+        analyze_pinecone_historical_stock(ticker="AAPL")
+        
+        # Analyze all stocks from Pinecone with score >= 60
+        analyze_pinecone_historical_stock(analyze_all=True, min_score=60, sort_by="performance")
+        
+        # Analyze stocks from a specific date
+        analyze_pinecone_historical_stock(analyze_all=True, date="2024-11-01", sort_by="news")
+    """
+    try:
+        if not analyze_all and not ticker:
+            return {
+                "error": "Must provide either 'ticker' for single stock analysis or set 'analyze_all=True' for all stocks",
+                "usage": "Examples: ticker='AAPL' or analyze_all=True"
+            }
+        
+        if analyze_all:
+            # Analyze all stocks from Pinecone
+            analyzer = PineconeHistoricalAnalyzer()
+            analyses = await analyzer.analyze_all_pinecone_stocks(
+                date=date,
+                min_score=min_score,
+                sort_by=sort_by
+            )
+            
+            if not analyses:
+                return {
+                    "error": "No stocks found in Pinecone for the specified date",
+                    "date": date or datetime.now().strftime('%Y-%m-%d'),
+                    "suggestion": "Run save-pinecone feature first to save stock recommendations"
+                }
+            
+            # Return summary of all stocks
+            return {
+                "analysis_type": "all_stocks",
+                "date_analyzed": date or datetime.now().strftime('%Y-%m-%d'),
+                "total_stocks": len(analyses),
+                "min_score_filter": min_score,
+                "sorted_by": sort_by,
+                "stocks": [
+                    {
+                        "ticker": a['ticker'],
+                        "company": a['company'],
+                        "current_price": a['current_data']['price'],
+                        "3month_change_percent": a['performance']['price_change_percent'],
+                        "performance_rating": a['performance']['performance_rating'],
+                        "recommendation": a['recommendation']['recommendation'],
+                        "score": a['recommendation']['score'],
+                        "action": a['recommendation']['action'],
+                        "confidence": a['recommendation']['confidence'],
+                        "news_sentiment": a['news_analysis'].get('overall_sentiment', 'N/A'),
+                        "news_score": a['news_analysis'].get('sentiment_score', 0),
+                        "trend": a['technical_analysis']['trend'],
+                        "key_factors": a['recommendation']['factors'][:3],
+                        "reasoning": a['recommendation']['reasoning']
+                    }
+                    for a in analyses
+                ]
+            }
+        
+        else:
+            # Analyze single stock
+            result = await analyze_pinecone_historical(
+                ticker=ticker,
+                date=date,
+                analyze_all=False
+            )
+            
+            if "error" in result:
+                return result
+            
+            # Format response for single stock
+            return {
+                "analysis_type": "single_stock",
+                "ticker": result['ticker'],
+                "company": result['company'],
+                "comparison_period": f"{result['comparison_date']} to {result['current_date']}",
+                "price_comparison": {
+                    "current": {
+                        "price": result['current_data']['price'],
+                        "date": result['current_date'],
+                        "recommendation": result['current_data']['recommendation'],
+                        "risk_level": result['current_data']['risk_level']
+                    },
+                    "3_months_ago": {
+                        "price": result['three_months_ago']['price'],
+                        "date": result['comparison_date'],
+                        "recommendation": result['three_months_ago']['recommendation'],
+                        "risk_level": result['three_months_ago']['risk_level']
+                    },
+                    "change": {
+                        "amount": result['performance']['price_change'],
+                        "percent": result['performance']['price_change_percent'],
+                        "rating": result['performance']['performance_rating']
+                    }
+                },
+                "technical_analysis": result['technical_analysis'],
+                "news_analysis": {
+                    "sentiment": result['news_analysis'].get('overall_sentiment', 'N/A'),
+                    "score": result['news_analysis'].get('sentiment_score', 0),
+                    "articles_count": result['news_analysis'].get('articles_analyzed', 0),
+                    "summary": result['news_analysis'].get('summary', 'No news available'),
+                    "top_headlines": [
+                        {
+                            "title": article['title'],
+                            "sentiment": article['sentiment'],
+                            "score": article['sentiment_score']
+                        }
+                        for article in result['news_analysis'].get('news', [])[:3]
+                    ]
+                },
+                "recommendation": {
+                    "recommendation": result['recommendation']['recommendation'],
+                    "action": result['recommendation']['action'],
+                    "confidence": result['recommendation']['confidence'],
+                    "score": result['recommendation']['score'],
+                    "max_score": result['recommendation']['max_score'],
+                    "key_factors": result['recommendation']['factors'],
+                    "reasoning": result['recommendation']['reasoning']
+                },
+                "analyzed_at": result['analyzed_at']
+            }
+    
+    except Exception as e:
+        return {
+            "error": str(e),
+            "message": "Failed to analyze historical performance. Ensure Pinecone has saved data."
+        }
 
 if __name__ == "__main__":
     # Initialize and run the server

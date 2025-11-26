@@ -14,13 +14,20 @@ stock_lists:
   # Main watchlist for general analysis
   default:
    
-    - NVDA
-    - AMD
-    - INTC
-    - F
+    - ABTS
+    - IMPP
+    - IBIO
+    - ECOR
     - NOK
-    - BAC
-    - WFC
+    - ZOMDF
+    - FAMI
+    - AMC
+    - SPCE
+    - PETZ
+    - SNDL
+    - TONX
+    - CEIN
+
     
   # Tech stocks
   tech:

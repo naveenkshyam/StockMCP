@@ -21,6 +21,11 @@ from features.historical_analyzer import analyze_3month_performance, get_3month_
 from features.auto_scheduler import StockScheduler, send_immediate_report
 from config_manager import get_config
 from features.pinecone_saver import PineconeStockSaver, save_to_pinecone
+from features.pinecone_historical import (
+    PineconeHistoricalAnalyzer,
+    analyze_pinecone_historical,
+    format_historical_report
+)
 
 
 # Default watchlist (can be customized)
@@ -368,6 +373,137 @@ async def feature_save_to_pinecone(args):
         print("\n✗ Failed to save recommendations to Pinecone")
 
 
+async def feature_pinecone_historical(args):
+    """Feature: Analyze historical performance of stocks in Pinecone (3-month comparison)"""
+    print(f"\n{'='*60}")
+    print("Feature: Pinecone Historical Analysis (3-Month Comparison)")
+    print(f"{'='*60}\n")
+    
+    analyzer = PineconeHistoricalAnalyzer()
+    
+    if args.ticker:
+        # Analyze single stock
+        print(f"Analyzing {args.ticker} with 3-month historical comparison...\n")
+        
+        analysis = await analyzer.analyze_with_news_and_recommendation(
+            ticker=args.ticker,
+            current_date=args.date
+        )
+        
+        if "error" in analysis:
+            print(f"✗ Error: {analysis['error']}")
+            return
+        
+        # Display results
+        print(f"{'='*70}")
+        print(f"{analysis['ticker']} - {analysis['company']}")
+        print(f"{'='*70}\n")
+        
+        # Price comparison
+        current = analysis['current_data']
+        old = analysis['three_months_ago']
+        perf = analysis['performance']
+        
+        print(f"PRICE COMPARISON:")
+        print(f"  Current ({analysis['current_date']}): ${current['price']:.2f}")
+        print(f"  3 Months Ago ({analysis['comparison_date']}): ${old['price']:.2f}")
+        print(f"  Change: {perf['price_change']:+.2f} ({perf['price_change_percent']:+.2f}%)")
+        print(f"  Performance Rating: {perf['performance_rating']}\n")
+        
+        # Recommendation comparison
+        print(f"RECOMMENDATION CHANGE:")
+        print(f"  3 Months Ago: {old['recommendation']} (Risk: {old['risk_level']})")
+        print(f"  Current: {current['recommendation']} (Risk: {current['risk_level']})\n")
+        
+        # Technical analysis
+        tech = analysis['technical_analysis']
+        print(f"TECHNICAL ANALYSIS:")
+        print(f"  Trend: {tech['trend']}")
+        print(f"  Volatility: {tech['volatility']}")
+        print(f"  Price vs MA20: {tech['price_vs_ma20']}")
+        print(f"  Price vs MA50: {tech['price_vs_ma50']}\n")
+        
+        # News analysis
+        news = analysis['news_analysis']
+        print(f"NEWS ANALYSIS:")
+        if news.get('news_available'):
+            print(f"  Overall Sentiment: {news['overall_sentiment']}")
+            print(f"  Sentiment Score: {news['sentiment_score']:.2f}")
+            print(f"  Articles Analyzed: {news['articles_analyzed']}")
+            print(f"\n  Recent Headlines:")
+            for article in news['news'][:3]:
+                print(f"    • {article['title'][:80]}...")
+                print(f"      Sentiment: {article['sentiment']} ({article['sentiment_score']:+.2f})")
+        else:
+            print(f"  No recent news available\n")
+        
+        # Final recommendation
+        rec = analysis['recommendation']
+        print(f"\n{'='*70}")
+        print(f"RECOMMENDATION: {rec['recommendation']} (Score: {rec['score']}/100)")
+        print(f"{'='*70}")
+        print(f"Action: {rec['action']}")
+        print(f"Confidence: {rec['confidence']}\n")
+        
+        print(f"Key Factors:")
+        for factor in rec['factors']:
+            print(f"  {factor}")
+        
+        print(f"\nReasoning:")
+        print(f"  {rec['reasoning']}\n")
+        
+        # Save if requested
+        if args.save:
+            filename = f"pinecone_historical_{args.ticker}_{args.save}.txt"
+            with open(filename, 'w') as f:
+                f.write(format_historical_report([analysis]))
+            print(f"Report saved to {filename}")
+    
+    else:
+        # Analyze all stocks from Pinecone
+        print(f"Analyzing ALL stocks from Pinecone for date: {args.date or 'today'}...")
+        print(f"Minimum score filter: {args.min_score}")
+        print(f"Sort by: {args.sort_by}\n")
+        
+        analyses = await analyzer.analyze_all_pinecone_stocks(
+            date=args.date,
+            min_score=args.min_score,
+            sort_by=args.sort_by
+        )
+        
+        if not analyses:
+            print("✗ No stocks found for analysis")
+            return
+        
+        print(f"\n{'='*70}")
+        print(f"Found {len(analyses)} stocks meeting criteria (score >= {args.min_score})")
+        print(f"{'='*70}\n")
+        
+        # Display top stocks
+        for i, analysis in enumerate(analyses[:args.display_limit], 1):
+            current = analysis['current_data']
+            perf = analysis['performance']
+            rec = analysis['recommendation']
+            news = analysis['news_analysis']
+            
+            print(f"{i}. {analysis['ticker']} - {analysis['company']}")
+            print(f"   Price: ${current['price']:.2f} | 3M Change: {perf['price_change_percent']:+.2f}% ({perf['performance_rating']})")
+            print(f"   Recommendation: {rec['recommendation']} (Score: {rec['score']}/100)")
+            print(f"   News: {news.get('overall_sentiment', 'N/A')} ({news.get('sentiment_score', 0):.2f})")
+            print(f"   Action: {rec['action']}")
+            print()
+        
+        if len(analyses) > args.display_limit:
+            print(f"... and {len(analyses) - args.display_limit} more stocks")
+        
+        # Save if requested
+        if args.save:
+            filename = f"pinecone_historical_all_{args.save}.txt"
+            with open(filename, 'w') as f:
+                f.write(format_historical_report(analyses))
+            print(f"\nFull report saved to {filename}")
+
+
 async def feature_historical_analysis(args):
     """Feature: 3-Month Historical Analysis"""
     print(f"\n{'='*60}")
@@ -494,7 +630,16 @@ Examples:
   # Save recommendations to Pinecone (config mode)
   python feature_manager.py save-pinecone --mode config --list default --top 20
   
-  # 3-month historical analysis
+  # Analyze historical performance of single stock (3-month comparison)
+  python feature_manager.py pinecone-historical --ticker AAPL
+  
+  # Analyze ALL stocks in Pinecone with 3-month comparison
+  python feature_manager.py pinecone-historical --min-score 60 --sort-by performance
+  
+  # Analyze historical for specific date
+  python feature_manager.py pinecone-historical --date 2024-11-01 --sort-by news
+  
+  # 3-month historical analysis (Yahoo Finance data)
   python feature_manager.py historical --min-performance 10
   
   # Send immediate email report
@@ -533,6 +678,20 @@ Examples:
     pinecone_parser.add_argument('--top', type=int, help='Number of top recommendations to save')
     pinecone_parser.add_argument('--min-price', type=float, help='Minimum price')
     pinecone_parser.add_argument('--max-price', type=float, help='Maximum price')
+    
+    # Pinecone Historical Analysis feature (NEW)
+    pinecone_hist_parser = subparsers.add_parser('pinecone-historical', 
+                                                   help='Analyze 3-month historical performance of stocks in Pinecone')
+    pinecone_hist_parser.add_argument('--ticker', type=str, help='Single ticker to analyze')
+    pinecone_hist_parser.add_argument('--date', type=str, help='Date to analyze (YYYY-MM-DD), defaults to today')
+    pinecone_hist_parser.add_argument('--min-score', type=int, default=50, 
+                                      help='Minimum recommendation score (0-100, default: 50)')
+    pinecone_hist_parser.add_argument('--sort-by', type=str, default='performance', 
+                                      choices=['performance', 'score', 'news'],
+                                      help='Sort results by performance, score, or news sentiment')
+    pinecone_hist_parser.add_argument('--display-limit', type=int, default=20,
+                                      help='Number of stocks to display (default: 20)')
+    pinecone_hist_parser.add_argument('--save', type=str, help='Save results to file (provide filename suffix)')
     
     # Historical analysis feature
     historical_parser = subparsers.add_parser('historical', help='3-month historical analysis')
@@ -576,6 +735,8 @@ Examples:
         asyncio.run(feature_analyze_stocks(args))
     elif args.feature == 'save-pinecone':
         asyncio.run(feature_save_to_pinecone(args))
+    elif args.feature == 'pinecone-historical':
+        asyncio.run(feature_pinecone_historical(args))
     elif args.feature == 'historical':
         asyncio.run(feature_historical_analysis(args))
     elif args.feature == 'email':

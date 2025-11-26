@@ -15,6 +15,7 @@ Advanced stock analysis system with news sentiment integration, smart recommenda
 ✅ **Flexible stock source options** (configured lists vs extended watchlist)  
 ✅ **Pinecone vector database** for tracking recommendation changes  
 ✅ **Historical comparison** - see how recommendations changed from yesterday  
+✅ **NEW: 3-Month Historical Analysis** - Compare current vs 3 months ago with news & recommendations  
 
 ## Stock Source Options
 
@@ -40,7 +41,7 @@ Advanced stock analysis system with news sentiment integration, smart recommenda
 
 ### Using in MCP Server
 ```python
-# Use configured stocks only (7 stocks from config.yaml)
+# Use configured stocks only (any stocks from config.yaml)
 result = await get_top_stock_recommendations_in_range(
     max_price=10.0,
     min_price=1.0,
@@ -79,6 +80,7 @@ This launches an interactive menu where you can:
 - Configure settings
 - Run tests
 - **Save recommendations to Pinecone** - Track changes over time 🆕
+- **Pinecone Historical Analysis (3-Month Comparison)** - Compare current vs 3 months ago 🔥 NEW!
 
 ## Alternative: Command Line Interface
 
@@ -150,10 +152,10 @@ python feature_manager.py schedule \
 ### Save to Pinecone (NEW!)
 ```bash
 # Save ALL stocks search results to Pinecone
-python feature_manager.py save-pinecone --mode all --top 10 --min-price 1.0 --max-price 10.0
+python features/feature_manager.py save-pinecone --mode all --top 10 --min-price 1.0 --max-price 10.0
 
 # Save configured stocks results to Pinecone
-python feature_manager.py save-pinecone --mode config --list default --top 20
+python features/feature_manager.py save-pinecone --mode config --list default --top 20
 ```
 
 **Why use Pinecone?**
@@ -161,6 +163,47 @@ python feature_manager.py save-pinecone --mode config --list default --top 20
 - Compare today's "Strong Buy" with yesterday's "Hold"
 - Identify stocks with improving or declining signals
 - Historical analysis of recommendation accuracy
+
+### Pinecone Historical Analysis (NEW! 🔥)
+```bash
+# Analyze single stock with 3-month comparison
+python features/feature_manager.py pinecone-historical --ticker AAPL
+
+# Analyze ALL stocks saved in Pinecone (score >= 60)
+python features/feature_manager.py pinecone-historical --min-score 60 --sort-by performance
+
+# Sort by news sentiment
+python features/feature_manager.py pinecone-historical --sort-by news --display-limit 10
+
+# Save detailed report
+python features/feature_manager.py pinecone-historical --min-score 70 --save report_20241126
+```
+
+**Using the Interactive Menu (run.py):**
+
+Select **option 9** from the main menu:
+
+**Option 1 - Single Stock Analysis:**
+- Enter ticker (e.g., NVDA, AAPL)
+- Get detailed 3-month comparison with:
+  - Price change percentage and rating
+  - Recommendation evolution (then vs now)
+  - Technical analysis (trend, volatility, moving averages)
+  - News sentiment with recent headlines
+  - 100-point recommendation score with reasoning
+
+**Option 2 - Bulk Analysis:**
+- Set minimum score filter (0-100, default: 50)
+- Choose sort method:
+  - `performance` - Best 3-month price gains
+  - `score` - Highest recommendation scores
+  - `news` - Most positive sentiment
+- Set display limit (default: 20 stocks)
+- Optionally save full report
+
+**Prerequisites:**
+- Must have saved data to Pinecone first (run option 8 or save-pinecone command)
+- Works best with data from 3 months ago for full comparison
 
 ## Configuration
 
@@ -205,19 +248,20 @@ analysis:
 ```
 server/
 ├── run.py                    # Interactive main menu (START HERE)
-├── feature_manager.py        # Command-line interface
-├── test_all_features.py      # Comprehensive test suite
+├── main.py                   # MCP server (advanced)
 ├── config.yaml               # Configuration file
 ├── config_manager.py         # Config loader
-├── email_notifier.py         # Email functionality
-├── main.py                   # MCP server (advanced)
-├── pinecone_saver.py         # Pinecone vector DB integration 🆕
+├── test_all_features.py      # Comprehensive test suite
 ├── features/
-│   ├── stock_analyzer.py     # Stock analysis + news integration
-│   ├── historical_analyzer.py # 3-month performance
-│   ├── news_analyzer.py      # News sentiment analysis
-│   └── auto_scheduler.py     # Automated scheduling
-└── .venv/                    # Virtual environment
+│   ├── feature_manager.py        # Command-line interface
+│   ├── stock_analyzer.py         # Stock analysis + news integration
+│   ├── historical_analyzer.py    # 3-month performance
+│   ├── news_analyzer.py          # News sentiment analysis
+│   ├── pinecone_saver.py         # Pinecone vector DB integration
+│   ├── pinecone_historical.py    # 3-month historical comparison 🆕
+│   ├── email_notifier.py         # Email functionality
+│   └── auto_scheduler.py         # Automated scheduling
+└── .venv/                        # Virtual environment
 ```
 
 ## Testing
@@ -257,32 +301,74 @@ Tests include:
 ### Example 1: Find Top 10 Affordable Stocks (NEW!)
 ```bash
 # Search ALL 60+ stocks for best opportunities
-python feature_manager.py search-all --top 10
+python features/feature_manager.py search-all --top 10
 ```
 
 ### Example 2: Track Recommendation Changes (NEW!)
 ```bash
 # Day 1: Save today's recommendations
-python feature_manager.py save-pinecone --mode all --top 10
+python features/feature_manager.py save-pinecone --mode all --top 10
 
 # Day 2: Search again and see what changed
-python feature_manager.py search-all --top 10
+python features/feature_manager.py search-all --top 10
 # Output will show: "Yesterday: Hold → Today: Buy" for changed recommendations
 ```
 
-### Example 3: Find Top 10 Penny Stocks from Config
+### Example 3: 3-Month Historical Analysis (NEW! 🔥)
+
+**Via Interactive Menu (Recommended):**
 ```bash
-python feature_manager.py analyze --list penny --top 10
+python run.py
+# Select option 9: Pinecone Historical Analysis
+
+# For single stock:
+# Choose option 1, enter ticker (e.g., AAPL)
+# Optionally save detailed report
+
+# For bulk analysis:
+# Choose option 2
+# Set min score (e.g., 60)
+# Choose sort method (performance/score/news)
+# Set display limit (e.g., 10)
 ```
 
-### Example 4: Stocks with 20%+ 3-Month Gains
+**Via Command Line:**
 ```bash
-python feature_manager.py historical --list default --min-performance 20
+# Analyze single stock with 3-month comparison, news, and recommendations
+python features/feature_manager.py pinecone-historical --ticker AAPL
+
+# Analyze ALL stocks saved in Pinecone (score >= 60)
+python features/feature_manager.py pinecone-historical --min-score 60 --sort-by performance
+
+# Sort by news sentiment
+python features/feature_manager.py pinecone-historical --sort-by news --display-limit 10
+
+# Save detailed report
+python features/feature_manager.py pinecone-historical --min-score 70 --save report_20241126
 ```
 
-### Example 5: Daily Morning Report
+**What You Get:**
+- Current price vs 3 months ago comparison
+- Percentage change with performance rating
+- Recommendation evolution tracking
+- Technical analysis (trend, volatility, MA20/MA50)
+- News sentiment with recent headlines
+- 100-point recommendation score
+- Detailed action plan with confidence level
+
+### Example 4: Find Top 10 Penny Stocks from Config
 ```bash
-python feature_manager.py schedule \
+python features/feature_manager.py analyze --list penny --top 10
+```
+
+### Example 5: Stocks with 20%+ 3-Month Gains
+```bash
+python features/feature_manager.py historical --list default --min-performance 20
+```
+
+### Example 6: Daily Morning Report
+```bash
+python features/feature_manager.py schedule \
   --schedule-type daily \
   --schedule-time 08:00 \
   --list default
@@ -339,6 +425,47 @@ Stocks are scored on 50 points based on:
 4. **Change Detection**: Shows recommendation evolution (e.g., "Hold → Strong Buy")
 5. **Track Accuracy**: See if "Buy" recommendations actually went up in price
 
+### 6. 3-Month Historical Analysis (NEW! 🔥)
+Compare stocks' current performance with 3 months ago from Pinecone data, combining:
+- **Price Performance**: Current price vs 3 months ago (gain/loss %)
+- **Recommendation Evolution**: How recommendations changed over time
+- **Technical Analysis**: Trend, volatility, MA20/MA50 comparison
+- **News Sentiment**: Current headlines and sentiment scoring
+- **Smart Recommendations**: 100-point scoring system considering all factors
+
+#### Comprehensive Scoring (100 points):
+- **3-Month Performance** (30 pts): >20%: +15, >10%: +10, >5%: +5
+- **Trend Analysis** (20 pts): Uptrend: +10, Downtrend: -10
+- **News Sentiment** (20 pts): Positive: +10, Negative: -10
+- **Technical Position** (15 pts): Above MA50: +8, Above MA20: +5
+- **Volatility** (10 pts): Low <30%: +5, High >50%: -5
+- **Recommendation Change** (5 pts): Upgraded: +5, Downgraded: -5
+
+#### Recommendation Levels:
+- **Strong Buy (75-100)**: Excellent opportunity
+- **Buy (60-74)**: Good entry point
+- **Hold/Accumulate (45-59)**: Maintain, add on dips
+- **Hold (30-44)**: Wait for clearer signals
+- **Caution (20-29)**: Consider trimming position
+- **Avoid/Sell (<20)**: Exit or avoid
+
+#### Use Cases:
+```bash
+# Analyze single stock with full breakdown
+python features/feature_manager.py pinecone-historical --ticker NVDA
+
+# Find top performers (score >= 70)
+python features/feature_manager.py pinecone-historical --min-score 70 --sort-by performance
+
+# Find stocks with positive news
+python features/feature_manager.py pinecone-historical --sort-by news --min-score 60
+
+# Detailed report with top 20 stocks
+python features/feature_manager.py pinecone-historical --display-limit 20 --save report
+```
+
+See `features/PINECONE_HISTORICAL_README.md` for detailed documentation.
+
 ## Tips
 
 1. **Use Config Lists**: Define your watchlists in `config.yaml` for quick access
@@ -346,6 +473,60 @@ Stocks are scored on 50 points based on:
 3. **Save Reports**: Use `--save filename` to keep records
 4. **Price Range**: Adjust in config.yaml or use `--min-price` and `--max-price`
 5. **Scheduler**: Run in `screen` or `tmux` for 24/7 operation
+6. **Pinecone Workflow**: Save data daily (option 8), analyze weekly (option 9) for best results
+
+## Complete Workflow Example
+
+### Daily Trading Workflow with Pinecone Tracking
+
+**Day 1 - Initial Setup:**
+```bash
+python run.py
+# Select option 8: Save to Pinecone
+# Choose mode 1 (ALL stocks) or 2 (configured)
+# This saves today's recommendations as baseline
+```
+
+**Day 2-89 - Daily Tracking:**
+```bash
+python run.py
+# Select option 1: Search ALL Stocks
+# Review today's top recommendations
+# Compare with yesterday's data (automatic)
+# Select option 8 again to save today's data
+```
+
+**Day 90+ - Historical Analysis:**
+```bash
+python run.py
+# Select option 9: Pinecone Historical Analysis
+# Choose option 2 for bulk analysis
+# Set min-score: 60 (quality stocks)
+# Sort by: performance (top movers)
+# Review which stocks improved over 3 months
+```
+
+### Best Practices
+
+1. **First Time Setup:**
+   - Configure `config.yaml` with your email and stock lists
+   - Run option 8 to save initial data to Pinecone
+   - Wait 3+ months for meaningful historical comparisons
+
+2. **Daily Routine:**
+   - Morning: Run option 1 (Search ALL stocks) for quick scan
+   - Review recommendation changes from yesterday
+   - Save to Pinecone (option 8) to track changes
+
+3. **Weekly Analysis:**
+   - Run option 9 (Historical Analysis) to see 3-month trends
+   - Filter by min-score 70+ for best opportunities
+   - Save reports for record keeping
+
+4. **Monthly Review:**
+   - Analyze all Pinecone data with sort-by performance
+   - Identify consistently strong stocks
+   - Review news sentiment patterns
 
 ## Support
 

@@ -36,3 +36,12 @@ Thumbs.db
 # Project specific
 *.log
 .env
+
+# Test output files
+stock_analysis_*.txt
+historical_analysis_*.txt
+top_*_stocks_*.txt
+all_stocks_top_*.txt
+pinecone_historical_*.txt
+stock_report_*.html
+daily_stock_report_*.html

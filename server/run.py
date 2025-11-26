@@ -63,6 +63,11 @@ def print_menu():
     print("   • Compare with tomorrow's recommendations")
     print("   • Track recommendation changes over time")
     print()
+    print("9. Pinecone Historical Analysis (3-Month Comparison) 🔥 NEW!")
+    print("   • Compare current stock data with 3 months ago")
+    print("   • News sentiment + technical analysis + recommendations")
+    print("   • 100-point scoring system with detailed insights")
+    print()
     print("0. Exit")
     print()
 
@@ -301,6 +306,60 @@ def run_save_to_pinecone():
     print(f"\nRunning: {cmd}\n")
     os.system(cmd)
 
+def run_pinecone_historical():
+    """Analyze historical performance of stocks saved in Pinecone"""
+    print("\n" + "-"*70)
+    print("PINECONE HISTORICAL ANALYSIS (3-MONTH COMPARISON)")
+    print("-"*70 + "\n")
+    
+    print("This feature compares current stock performance with 3 months ago")
+    print("combining price changes, news sentiment, and technical analysis.")
+    print()
+    
+    print("Options:")
+    print("1. Analyze single stock (detailed breakdown)")
+    print("2. Analyze ALL stocks from Pinecone (bulk analysis)")
+    
+    choice = input("\nSelect option (1-2): ").strip()
+    
+    if choice == "1":
+        ticker = input("Enter ticker symbol (e.g., AAPL): ").strip().upper()
+        
+        cmd = f"{get_python_path()} features/feature_manager.py pinecone-historical --ticker {ticker}"
+        
+        save = input("Save detailed report? (y/N): ").strip().lower()
+        if save == 'y':
+            filename = input("Enter filename suffix (e.g., 'AAPL_report'): ").strip() or f"{ticker}_historical"
+            cmd += f" --save {filename}"
+    
+    elif choice == "2":
+        min_score = input("Minimum recommendation score (0-100, default 50): ").strip() or "50"
+        
+        print("\nSort options:")
+        print("  performance - Sort by 3-month price change")
+        print("  score       - Sort by recommendation score")
+        print("  news        - Sort by news sentiment")
+        
+        sort_by = input("Sort by (default: performance): ").strip() or "performance"
+        
+        display_limit = input("How many stocks to display (default 20): ").strip() or "20"
+        
+        cmd = f"{get_python_path()} features/feature_manager.py pinecone-historical --min-score {min_score} --sort-by {sort_by} --display-limit {display_limit}"
+        
+        save = input("\nSave full report? (y/N): ").strip().lower()
+        if save == 'y':
+            filename = input("Enter filename suffix: ").strip() or "historical_analysis"
+            cmd += f" --save {filename}"
+    
+    else:
+        print("Invalid option")
+        return
+    
+    print(f"\nRunning: {cmd}\n")
+    print("This may take a moment as it fetches live data and analyzes news...")
+    print()
+    os.system(cmd)
+
 def run_tests():
     """Run test suite"""
     print("\n" + "-"*70)
@@ -328,7 +387,7 @@ def main():
         print_banner()
         print_menu()
         
-        choice = input("Select feature (0-8): ").strip()
+        choice = input("Select feature (0-9): ").strip()
         
         if choice == "0":
             print("\nGoodbye!\n")
@@ -349,8 +408,10 @@ def main():
             run_tests()
         elif choice == "8":
             run_save_to_pinecone()
+        elif choice == "9":
+            run_pinecone_historical()
         else:
-            print("\n⚠ Invalid choice. Please select 0-8.\n")
+            print("\n⚠ Invalid choice. Please select 0-9.\n")
             input("Press Enter to continue...")
         
         if choice != "0":
