@@ -510,7 +510,18 @@ async def feature_historical_analysis(args):
     print("Feature: 3-Month Historical Performance Analysis")
     print(f"{'='*60}\n")
     
-    tickers = args.tickers.split(',') if args.tickers else DEFAULT_WATCHLIST
+    config = get_config()
+    
+    # Get stock list from config or command line
+    if args.tickers:
+        tickers = args.tickers.split(',')
+    elif args.list:
+        tickers = config.get_stock_list(args.list)
+        print(f"Using watchlist '{args.list}' from config")
+    else:
+        tickers = DEFAULT_WATCHLIST
+        print("Using default watchlist")
+    
     print(f"Analyzing 3-month performance for {len(tickers)} stocks...\n")
     
     recommendations = await get_3month_recommendations(
@@ -696,9 +707,10 @@ Examples:
     # Historical analysis feature
     historical_parser = subparsers.add_parser('historical', help='3-month historical analysis')
     historical_parser.add_argument('--tickers', type=str, help='Comma-separated ticker symbols')
+    historical_parser.add_argument('--list', type=str, help='Use stock list from config (e.g., default, tech, penny, finance, ev_clean, custom)')
     historical_parser.add_argument('--min-price', type=float, default=1.0, help='Minimum price (default: 1.0)')
     historical_parser.add_argument('--max-price', type=float, default=10.0, help='Maximum price (default: 10.0)')
-    historical_parser.add_argument('--min-performance', type=float, default=0.0, help='Minimum 3-month performance % (default: 0.0)')
+    historical_parser.add_argument('--min-performance', type=float, default=0.0, help='Minimum 3-month performance percent (default: 0.0)')
     historical_parser.add_argument('--save', type=str, help='Save results to file (provide filename suffix)')
     
     # Email feature
