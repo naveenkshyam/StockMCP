@@ -26,6 +26,11 @@ from features.pinecone_historical import (
     analyze_pinecone_historical,
     format_historical_report
 )
+from features.daytrading_analyzer import (
+    get_daytrading_recommendations,
+    format_daytrading_report,
+    DAYTRADING_WATCHLIST
+)
 
 
 # Default watchlist (can be customized)
@@ -623,6 +628,78 @@ def feature_schedule_email(args):
     scheduler.run()
 
 
+async def feature_daytrading(args):
+    """Feature: Day Trading Stock Recommendations"""
+    print(f"\n{'='*60}")
+    print("Feature: Day Trading Recommendations")
+    print(f"{'='*60}\n")
+    
+    # Determine which watchlist to use
+    if args.tickers:
+        tickers = args.tickers.split(',')
+        print(f"Analyzing {len(tickers)} custom stocks for day trading...")
+    elif args.all:
+        tickers = DAYTRADING_WATCHLIST
+        print(f"Analyzing ALL {len(tickers)} day trading stocks...")
+    else:
+        # Use default day trading watchlist
+        tickers = DAYTRADING_WATCHLIST[:30]  # Top 30 from day trading list
+        print(f"Analyzing {len(tickers)} stocks from day trading watchlist...")
+    
+    max_price = args.max_price if args.max_price else 20.0
+    min_score = args.min_score if args.min_score else 55
+    top_n = args.top if args.top else 10
+    
+    print(f"Max Price: ${max_price}")
+    print(f"Min Score: {min_score}/100")
+    print(f"Top N: {top_n}\n")
+    
+    # Get day trading recommendations
+    recommendations = await get_daytrading_recommendations(
+        tickers=tickers,
+        max_price=max_price,
+        min_score=min_score,
+        top_n=top_n
+    )
+    
+    if not recommendations:
+        print("No day trading opportunities found matching criteria.")
+        return
+    
+    print(f"\n{'='*80}")
+    print(f"TOP {len(recommendations)} DAY TRADING OPPORTUNITIES")
+    print(f"{'='*80}\n")
+    
+    for i, stock in enumerate(recommendations, 1):
+        print(f"{i}. {stock['ticker']} - {stock['company']}")
+        print(f"   Price: ${stock['current_price']:.2f}")
+        print(f"   Day Trading Score: {stock['score']}/100")
+        print(f"   Recommendation: {stock['recommendation']}")
+        print(f"   Action: {stock['action']}")
+        
+        metrics = stock['metrics']
+        print(f"   Volatility: {metrics['avg_intraday_range']:.2f}% avg intraday range")
+        print(f"   Volume: {metrics['volume_ratio']:.2f}x average ({metrics['avg_volume']:,} shares)")
+        print(f"   5-Day Change: {metrics['recent_change_5d']:+.2f}%")
+        
+        print(f"   News: {stock['news']['sentiment']} (Impact: {stock['news']['impact']})")
+        print(f"   Trend: {stock['trend']}")
+        
+        targets = stock['targets']
+        print(f"   Targets: ${targets['low']:.2f} (2%) / ${targets['medium']:.2f} (3%) / ${targets['high']:.2f} (5%)")
+        print(f"   Stop Loss: ${targets['stop_loss']:.2f}")
+        
+        print()
+    
+    # Save if requested
+    if args.save:
+        report = format_daytrading_report(recommendations)
+        filename = f"daytrading_recommendations_{args.save}.txt"
+        with open(filename, 'w') as f:
+            f.write(report)
+        print(f"\n✓ Full report saved to {filename}")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Stock Analysis Feature Manager",
@@ -652,6 +729,12 @@ Examples:
   
   # 3-month historical analysis (Yahoo Finance data)
   python feature_manager.py historical --min-performance 10
+  
+  # Day trading recommendations (top 10 stocks under $20)
+  python feature_manager.py daytrading --top 10 --max-price 20
+  
+  # Day trading - analyze ALL stocks in day trading watchlist
+  python feature_manager.py daytrading --all --top 15 --min-score 65
   
   # Send immediate email report
   python feature_manager.py email --email-from you@gmail.com --email-password xxx --email-to recipient@gmail.com
@@ -713,6 +796,15 @@ Examples:
     historical_parser.add_argument('--min-performance', type=float, default=0.0, help='Minimum 3-month performance percent (default: 0.0)')
     historical_parser.add_argument('--save', type=str, help='Save results to file (provide filename suffix)')
     
+    # Day Trading feature (NEW)
+    daytrading_parser = subparsers.add_parser('daytrading', help='Day trading stock recommendations')
+    daytrading_parser.add_argument('--tickers', type=str, help='Comma-separated ticker symbols')
+    daytrading_parser.add_argument('--all', action='store_true', help='Analyze ALL stocks in day trading watchlist (75+ stocks)')
+    daytrading_parser.add_argument('--max-price', type=float, default=20.0, help='Maximum stock price (default: 20.0)')
+    daytrading_parser.add_argument('--min-score', type=int, default=55, help='Minimum day trading score 0-100 (default: 55)')
+    daytrading_parser.add_argument('--top', type=int, default=10, help='Number of top recommendations (default: 10)')
+    daytrading_parser.add_argument('--save', type=str, help='Save results to file (provide filename suffix)')
+    
     # Email feature
     email_parser = subparsers.add_parser('email', help='Send email report')
     email_parser.add_argument('--tickers', type=str, help='Comma-separated ticker symbols')
@@ -751,6 +843,8 @@ Examples:
         asyncio.run(feature_pinecone_historical(args))
     elif args.feature == 'historical':
         asyncio.run(feature_historical_analysis(args))
+    elif args.feature == 'daytrading':
+        asyncio.run(feature_daytrading(args))
     elif args.feature == 'email':
         asyncio.run(feature_send_email(args))
     elif args.feature == 'schedule':

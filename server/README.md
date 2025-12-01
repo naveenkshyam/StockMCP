@@ -15,7 +15,8 @@ Advanced stock analysis system with news sentiment integration, smart recommenda
 ✅ **Flexible stock source options** (configured lists vs extended watchlist)  
 ✅ **Pinecone vector database** for tracking recommendation changes  
 ✅ **Historical comparison** - see how recommendations changed from yesterday  
-✅ **NEW: 3-Month Historical Analysis** - Compare current vs 3 months ago with news & recommendations  
+✅ **3-Month Historical Analysis** - Compare current vs 3 months ago with news & recommendations  
+✅ **NEW: Day Trading Analyzer** - Find best day trading stocks with volatility, volume, and news analysis 🔥  
 
 ## Stock Source Options
 
@@ -81,6 +82,7 @@ This launches an interactive menu where you can:
 - Run tests
 - **Save recommendations to Pinecone** - Track changes over time 🆕
 - **Pinecone Historical Analysis (3-Month Comparison)** - Compare current vs 3 months ago 🔥 NEW!
+- **Day Trading Recommendations** - Find volatile, liquid stocks perfect for day trading 🔥 NEW!
 
 ## Alternative: Command Line Interface
 
@@ -118,6 +120,21 @@ python feature_manager.py historical --list penny --min-performance 10
 
 # Save results
 python feature_manager.py historical --list tech --save tech_historical
+```
+
+### Day Trading Recommendations (NEW! 🔥)
+```bash
+# Find top 10 day trading stocks (under $20)
+python features/feature_manager.py daytrading --top 10
+
+# Analyze ALL 75+ day trading stocks
+python features/feature_manager.py daytrading --all --top 15 --min-score 65
+
+# Custom tickers for day trading analysis
+python features/feature_manager.py daytrading --tickers PLTR,SOFI,NIO --max-price 20
+
+# Save detailed day trading report
+python features/feature_manager.py daytrading --top 10 --save daytrading_report
 ```
 
 ### Email Reports
@@ -257,8 +274,9 @@ server/
 │   ├── stock_analyzer.py         # Stock analysis + news integration
 │   ├── historical_analyzer.py    # 3-month performance
 │   ├── news_analyzer.py          # News sentiment analysis
+│   ├── daytrading_analyzer.py    # Day trading recommendations 🆕
 │   ├── pinecone_saver.py         # Pinecone vector DB integration
-│   ├── pinecone_historical.py    # 3-month historical comparison 🆕
+│   ├── pinecone_historical.py    # 3-month historical comparison
 │   ├── email_notifier.py         # Email functionality
 │   └── auto_scheduler.py         # Automated scheduling
 └── .venv/                        # Virtual environment
@@ -374,6 +392,18 @@ python features/feature_manager.py schedule \
   --list default
 ```
 
+### Example 7: Day Trading Morning Scan (NEW! 🔥)
+```bash
+# Quick morning scan for day trading opportunities
+python features/feature_manager.py daytrading --top 10 --min-score 65
+
+# Comprehensive scan of all 75+ day trading stocks
+python features/feature_manager.py daytrading --all --top 15 --min-score 70 --save morning_scan
+
+# Focus on specific volatile stocks
+python features/feature_manager.py daytrading --tickers RIVN,NIO,PLTR,SOFI,LCID --max-price 20
+```
+
 ## Features in Detail
 
 ### 1. Stock Analysis
@@ -449,20 +479,73 @@ Compare stocks' current performance with 3 months ago from Pinecone data, combin
 - **Caution (20-29)**: Consider trimming position
 - **Avoid/Sell (<20)**: Exit or avoid
 
-#### Use Cases:
+### 7. Day Trading Analyzer (NEW! 🔥)
+Specialized tool for identifying high-potential day trading opportunities with comprehensive analysis:
+
+#### Key Features:
+- **Volatility Analysis**: Average intraday range (optimal: 3-7%)
+- **Volume Metrics**: Liquidity checks and recent activity
+- **Price Momentum**: MA crossovers and trend strength
+- **Gap Analysis**: Opening gaps create trading opportunities
+- **News Impact**: Sentiment-driven volatility detection
+- **Technical Trajectory**: Price trend using linear regression
+- **Market Cap Filter**: Excludes illiquid penny stocks (<$100M)
+
+#### Scoring System (0-100):
+- **Volatility** (30 pts): Higher intraday range = more opportunities
+- **Volume** (20 pts): High volume ratio indicates strong liquidity
+- **Momentum** (15 pts): MA crossovers and price position
+- **News** (10 pts): Strong sentiment creates volatility
+- **Trend** (10 pts): Identifies directional opportunities
+- **Gaps** (10 pts): Morning gaps = trading opportunities
+- **Liquidity** (5 pts): Volume > 500k shares minimum
+
+#### Day Trading Recommendations:
+- **Excellent (85-100)**: Strong Buy for Day Trading
+- **Very Good (75-84)**: Buy for Day Trading
+- **Good (65-74)**: Consider for Day Trading
+- **Moderate (55-64)**: Watch for Entry
+- **Poor (<55)**: Skip
+
+#### What You Get:
+- **Trading Metrics**: Volatility, volume ratio, 5-day momentum
+- **News Impact**: Sentiment analysis with impact level
+- **Price Targets**: 2%, 3%, and 5% gain targets
+- **Stop Loss**: Automatic 2% stop loss calculation
+- **Key Levels**: Support, resistance, and moving averages
+- **Trend Analysis**: Current price trajectory
+
+#### Day Trading Watchlist (75+ Stocks):
+- **Tech & Growth**: PLTR, SOFI, NIO, LCID, RIVN, GRAB, NU
+- **Financial**: BAC, WFC, C, ALLY, SCHW
+- **Energy**: F, PLUG, FCEL, VALE, X, CLF
+- **Cannabis**: TLRY, CGC, SNDL, ACB, CRON
+- **Crypto-Related**: MARA, RIOT, COIN
+- **High Volatility**: AMC, GME, BB (meme stocks)
+- And 50+ more liquid, volatile stocks
+
+#### Usage Examples:
 ```bash
-# Analyze single stock with full breakdown
-python features/feature_manager.py pinecone-historical --ticker NVDA
+# Quick scan: Top 10 day trading opportunities
+python features/feature_manager.py daytrading --top 10
 
-# Find top performers (score >= 70)
-python features/feature_manager.py pinecone-historical --min-score 70 --sort-by performance
+# Comprehensive: All 75+ stocks, minimum score 65
+python features/feature_manager.py daytrading --all --top 15 --min-score 65
 
-# Find stocks with positive news
-python features/feature_manager.py pinecone-historical --sort-by news --min-score 60
+# Custom analysis with specific stocks
+python features/feature_manager.py daytrading --tickers PLTR,SOFI,NIO,RIVN
 
-# Detailed report with top 20 stocks
-python features/feature_manager.py pinecone-historical --display-limit 20 --save report
+# Save detailed report
+python features/feature_manager.py daytrading --top 10 --save today
 ```
+
+#### Best Practices:
+1. **Morning Scan**: Run at market open to identify opportunities
+2. **Min Score**: Use 65+ for quality trades, 75+ for best setups
+3. **Volume Check**: Ensure avg volume > 1M shares for good fills
+4. **News Impact**: High news impact = increased volatility/opportunity
+5. **Risk Management**: Always use provided stop loss levels
+6. **Target Selection**: Start with 2% targets, scale to 3-5% as momentum builds
 
 See `features/PINECONE_HISTORICAL_README.md` for detailed documentation.
 
